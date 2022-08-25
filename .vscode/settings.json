@@ -1,0 +1,6 @@
+{
+    "jupyter.themeMatplotlibPlots": true,
+    "files.associations": {
+        "simprecurse.C": "cpp"
+    }
+}
