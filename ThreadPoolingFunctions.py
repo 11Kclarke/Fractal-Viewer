@@ -1,3 +1,23 @@
+@njit(fastmath = True)
+def newtonsmethodknownrootcount(f,fprime,x0,tol=1e-6,N=4,maxdepth=500):
+    x=x0+0j
+    for i in range(maxdepth):
+        x=x-f(x)/fprime(x)
+        if abs(f(x))<tol:
+            root=np.float64(abs(x.real+x.imag))#convert to real number that is different from its complex conjugate
+            #root = np.float64(int(abs(x.real+x.imag)*10**-(N+1))*10**-(N+1))
+            #preferably as different as possible from the other roots
+            #this is required as matplotlib canot colourise complex numbers
+            return root  
+    return root  
+
+
+def covfunc(multithreadgen,npoints,maxdepth,iterator,fractgenerator):
+    def cov(function,x1,x2,y1,y2,npoints=npoints, maxdepth=maxdepth,complex=True,threads=9):
+        
+        return multithreadgen(function,x1,x2,y1,y2,threads,npoints, maxdepth,complex,iterator=iterator,fractgenerator=fractgenerator)
+    return cov
+
 """splits domain defined by x1,x2,y1,y2 into n subdomains, completely covering the domain. Outputs subdomains as a list of (x1,x2,y1,y2) tuples"""
 def splitdomain(x1,x2,y1,y2,n):
     n=int(math.sqrt(n))
@@ -84,3 +104,27 @@ def genfractfromvertex(function,x1,x2,y1,y2,npoints=500, maxdepth=150,iscomplex=
     #print("finished stabilities")
     #print(extent)
     return stabilities,extent
+
+
+def newtonsfractal(f,x1,x2,y1,y2,npoints=600, maxdepth=80,tol=1e-6,iscomplex=True,iterator=newtonsmethod):
+    dydx= sp.diff(f,x)
+    dydx=sp.lambdify(x,dydx)
+    f=sp.lambdify(x,f)
+    xvals = np.linspace(x1,x2,npoints)
+    yvals = np.linspace(y1,y2,npoints)
+    print(npoints)
+    print((npoints,npoints))
+    roots = np.zeros((npoints,npoints),dtype=np.float32)#cannot be dtype complex as it will break the colouring
+    extent = [x1,x2,y1,y2]
+    if iscomplex:
+        yvals=yvals*1j
+    xc=0
+    for x in xvals:
+        yc=0
+        for y in yvals:
+            roots[xc,yc]=iterator(f,dydx,x+y,tol=tol,maxdepth=maxdepth)
+            yc+=1
+        xc+=1
+    for i in np.unique(roots):
+       print(i)
+    return roots,extent
