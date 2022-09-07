@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sympy as sp
 from sympy.utilities.lambdify import lambdify
+from sympy.parsing.sympy_parser import parse_expr
 from multiprocessing import Pool
 import sys
 import timeit
@@ -126,7 +127,8 @@ def polyderiv(x):
 def newtonsfractalfornjit(x1,x2,y1,y2,npoints=600, maxdepth=80,tol=1e-6,iterator=newtonsmethod,Nroots=None):#,f=None,dydx=None):
     #print(type(tol))
     #print(str(tol))
-
+    tol=(((x1-x2)/npoints)**2+((y1-y2)/npoints)**2)/4
+    N=int(np.log10(tol))
     flatroots = np.ones((npoints,npoints),dtype=np.float64).flatten()#cannot be dtype complex as it will break the colouringa
     extent = [x1,x2,y1,y2]
     xvals = np.linspace(x1*1j,x2*1j,npoints)
@@ -134,8 +136,8 @@ def newtonsfractalfornjit(x1,x2,y1,y2,npoints=600, maxdepth=80,tol=1e-6,iterator
     
     #put in 1 loop as it parralelizes easier
     for c in prange(0,npoints*npoints):
-            #flatroots[c]=iterator(f,dydx,xvals[c//npoints]+yvals[c%npoints],tol=tol,N=N,maxdepth=maxdepth)
-            flatroots[c]=iterator(xvals[c//npoints]+yvals[c%npoints])       
+            flatroots[c]=iterator(xvals[c//npoints]+yvals[c%npoints],Tol=tol,N=N)
+            #flatroots[c]=iterator(xvals[c//npoints]+yvals[c%npoints])       
     #for this algorithm to work difference between roots needs to be greater then difference between different copies of same root
     #this wont be fulfilled in the case of stacked roots for example X^5 has 5 roots exactly at 0 and will find 5 different rounding errors
     roots=flatroots.reshape(npoints,npoints)
@@ -161,6 +163,10 @@ def newtonsfractalfornjit(x1,x2,y1,y2,npoints=600, maxdepth=80,tol=1e-6,iterator
     print(np.unique(roots))
     print("\n\n")
     return roots,extent
+
+
+
+
 
 """returns function that returns fractal defined by f, in bounds of x1,y2"""
 def factoryfunc(f,gen = newtonsfractalfornjit, iterator=None,npoints=600, maxdepth=400,tol=1e-9,iscomplex=True,Nroots=None):
@@ -227,13 +233,8 @@ def iterator(function, maxdepth, value,D,divergencedetector=absdivergencedetecto
         cycle,period=cycledetector(ys,D,cycles,i%cycles)#checks for cycle
         if cycle:
             return period
-            #return maxdepth*1.5
         if divergencedetector(ys[i%cycles],divlim):
             return i
-        """ys[-1]= function(ys[-1],value)
-        for i in range(cycles-1):
-            ys[i]=ys[i+1]"""
-        
     return maxdepth+10
 
 """Takes complex to complex function, and complex value, 
@@ -419,9 +420,34 @@ def drawStabilityFractal(x1=-2.0,x2=2.0,y1=-2.0,y2=2.0,fractgenerator=genfractfr
     cov = covfunc1thread(f=f,npoints=res,maxdepth = maxdepth,iterator=prepiterator,fractgenerator=fractgenerator)#integrates options into gen
     Draw(stabilities,startbounds,generator=cov,plottype=plottype,cmap=cmap)#draws view and incorperates gen, for zooming
 
-
+"""default values are all reasonable, should only need to change whats specific for use case 
+f can be given as a sympy expression, string that parses to sympy, or calleable function pared with fprime"""
+def drawnewtontypefractal(x1=-2.0,x2=2.0,y1=-2.0,y2=2.0,fractgenerator=newtonsfractalfornjit
+    ,iterator=newtonsmethod,f="x**2-x+1+x**5",fprime=None,npoints=1000, maxdepth=200,plottype="imshow",cmap="Dark2"):
+    if type(f)==type("string"):
+        f=parse_expr(f)
+    if str(type(type(f)))=="<class 'sympy.core.assumptions.ManagedProperties'>":#checks if sympy expression, need 2 types as different types of sympy expressions
+        fprime = sp.diff(f,x)
+        f=sp.lambdify(x,f,"numpy")
+        fjit=njit(nopython=True,fastmath=True,locals={"x":complex128})(f)
+        fprime=sp.lambdify(x,fprime,"numpy")
+        fprimejit=njit(nopython=True,fastmath=True,locals={"x":complex128})(fprime)
+    else:
+        fjit=njit(nopython=True,fastmath=True,locals={"x":complex128})(f)
+        fprimejit=njit(nopython=True,fastmath=True,locals={"x":complex128})(fprime)
+    assert callable(fjit)
+    assert callable(fprimejit)
+    tol=(((x1-x2)/npoints)**2+((y1-y2)/npoints)**2)/4
+    @njit
+    def prepiterator(X0,N,Tol):
+        return iterator(fjit,fprimejit,X0,tol=Tol,N=N,maxdepth=maxdepth)
+    def prepfractgen(x1,x2,y1,y2):
+        return fractgenerator(x1,x2,y1,y2,npoints=npoints, maxdepth=maxdepth,tol=tol,iterator=prepiterator)
+    stabilities,startbounds=fractgenerator(x1,x2,y1,y2,npoints=npoints,maxdepth=maxdepth,iterator=prepiterator) 
+    Draw(stabilities,startbounds,generator=prepfractgen,plottype=plottype,cmap=cmap)#draws view and incorperates gen, for zooming
 
 """ReadMe:
+Easiest way to use is the 2 functions directly above Drawnewtontypefractal and draw stabilitytypefractal. you can simply run these with there defaults
 To Gen fractal, you need a generator functionl/iterator, 
 that defines the type, for mandlebrot like fractals use genfromvertex, 
 for newton types use newtons fractal. 
@@ -430,9 +456,6 @@ use calleable complex function. Later should take sympy equation. Newton types a
 
 Draw draws a fractal. For draw to be able to Redraw after zoom it needs to be passed pairing
 of gen and seed, as well as the original image.
-
-Multithreadgen takes a generator seed pairing, and generates N fratals with N threads then
-sticks them back together. This is important to reduce the amount of time it takes to generate
 
 covfunc is a function wrapper that outputs a generator seed pairing, and wraps it together with all options set,
 so it can be passed to Draw without draw needing to be passed all of the generation options.
@@ -446,38 +469,13 @@ if __name__ == '__main__':
     res = 1000
     maxdepth = 200
    
-   
-   
-   
-    #stabilities,startbounds= newtonsfractal(f,-4,4,-4,4)
-   
     starttime = timeit.default_timer()
-    #stabilities,startbounds=multithreadgen(f,-2,2,-2,2,npoints=res,maxdepth=maxdepth,iterator=iterator,fractgenerator=fractgenerator)
-    #(f,-2,2,-2,2,npoints=res,maxdepth=maxdepth,iterator=iterator,fractgenerator=fractgenerator)
-    #stabilities,startbounds=genfractfromvertexfornjit(f,-2,2,-2,2,npoints=res,maxdepth=maxdepth,iterator=iterator)
-    #stabilities,startbounds=newtonsfractalfornjit(f,-0.6,0.6,-0.4,0.4,npoints=2000)
+    
 
-    drawStabilityFractal(f=exponential,npoints=4000,maxdepth=200,ncycles=64)
-    #for drawing mandlebrot with cycles shown
-    """fractgenerator=genfractfromvertexfornjit
-    iterator = iterator
-    f= mandlebrot"""
+    #drawStabilityFractal(f=exponential,npoints=4000,maxdepth=200,ncycles=64)
+    drawnewtontypefractal()
+   
     
     #f=x**2-x+1+x**5#example of seed for Newton fractal
     
-    """ fprime = sp.diff(f,x)
-    f=sp.lambdify(x,f,"numpy")
-    fjit=numba.njit(f)
-    fprime=sp.lambdify(x,fprime,"numpy")
-    fprimejit=numba.njit(fprime)
-    fractgenerator = newtonsfractalfornjit"""
     
-    #fractgenerator = factoryfunc(f,npoints=res,maxdepth=maxdepth,tol=1e-8,Nroots=5)
-    #stabilities,startbounds=fractgenerator(-2.0,2.0,-2.0,2.0)
-
-    
-    #stabilities,startbounds=fractgenerator(f,-2.0,2.0,-2.0,2.0,npoints=res,maxdepth=maxdepth,iterator=iterator)
-    #print("First run:", timeit.default_timer() - starttime)
-    #cov = covfunc1thread(f=f,npoints=res,maxdepth = maxdepth,iterator=iterator,fractgenerator=fractgenerator)
-    #Draw(stabilities,startbounds,generator=cov,plottype="imshow",cmap="Dark2")
-   
