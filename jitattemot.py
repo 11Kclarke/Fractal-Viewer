@@ -166,57 +166,6 @@ def newtonsfractalfornjit(x1,x2,y1,y2,npoints=600, maxdepth=80,tol=1e-6,iterator
 
 
 
-
-
-"""returns function that returns fractal defined by f, in bounds of x1,y2"""
-def factoryfunc(f,gen = newtonsfractalfornjit, iterator=None,npoints=600, maxdepth=400,tol=1e-9,iscomplex=True,Nroots=None):
-    fprime = sp.diff(f,x)
-    f=sp.lambdify(x,f,"numpy")
-    print(inspect.getsource(f))
-    fjit=njit(nopython=True,locals={"x":complex128})(f)
-    fprime=sp.lambdify(x,fprime,"numpy")
-    print(inspect.getsource(fprime))
-    fprimejit=njit(nopython=True,locals={"x":complex128})(fprime)
-    """Nroots=None
-    if Nroots == None and iterator == None:
-        iterator = vectnewtonsmethod
-    elif Nroots != None and iterator == None:
-        iterator = newtonsmethodknownrootcount
-    else:
-        print(iterator)
-        print("has been selected manually")"""
-    print(tol)
-    #def vectiterator(x0,f=fjit,dydx=fprimejit):
-        #return iterator(x0,f=fjit,dydx=fprimejit)
-    #@vectorize("complex128(float64)",nopython=True,fastmath = True)
-    #def vectorizeiterator(X0):
-    
-    print(fjit)
-    print(fprimejit)
-    print(fjit(fjit(1j)))
-    print(fprimejit(fprime(1j)))
-    N=int(np.log10(tol))
-    @njit(float64(complex128),nopython=True,locals={"x":complex128,"root":float64})
-    def vectnewtonsmethod(x0):#,f=None,fprime=None):
-        x=x0+0j
-        root=np.float64(-1)
-        for i in range(maxdepth):
-            x=x-fjit(x)/fprimejit(x)
-            if abs(fjit(x))<tol:
-                root=np.float64(round(abs(x.real+x.imag),-(N+2)))#convert to real number that is different from its complex conjugate
-                #root = np.float64(int(abs(x.real+x.imag)*10**-(N+1))*10**-(N+1))
-                #preferably as different as possible from the other roots
-                #this is required as matplotlib canot colourise complex numbers
-                break
-        return root
-        #return vectnewtonsmethod(X0)
-    print(vectnewtonsmethod)
-    def newtonsfractal(x1,x2,y1,y2,npoints=npoints, maxdepth=maxdepth,tol=tol,iterator=vectnewtonsmethod,Nroots=Nroots):
-        print(iterator)
-        return gen(x1,x2,y1,y2,npoints=npoints, maxdepth=maxdepth,tol=tol,iterator=iterator,Nroots=Nroots) 
-    return newtonsfractal
-    
-
 """function should be callable, in form of lamdified sympy
 divergence detector should return True if diverged"""
 @njit(fastmath = True)
@@ -433,8 +382,8 @@ def drawnewtontypefractal(x1=-2.0,x2=2.0,y1=-2.0,y2=2.0,fractgenerator=newtonsfr
         fprime=sp.lambdify(x,fprime,"numpy")
         fprimejit=njit(nopython=True,fastmath=True,locals={"x":complex128})(fprime)
     else:
-        fjit=njit(nopython=True,fastmath=True,locals={"x":complex128})(f)
-        fprimejit=njit(nopython=True,fastmath=True,locals={"x":complex128})(fprime)
+        fjit=vectorize(nopython=True,fastmath=True,locals={"x":complex128})(f)
+        fprimejit=vectorize(nopython=True,fastmath=True,locals={"x":complex128})(fprime)
     assert callable(fjit)
     assert callable(fprimejit)
     tol=(((x1-x2)/npoints)**2+((y1-y2)/npoints)**2)/4
