@@ -1,3 +1,5 @@
+import sys
+print(sys.version)
 from tokenize import Exponent
 from matplotlib.transforms import Transform
 import numpy as np
@@ -372,7 +374,7 @@ def drawStabilityFractal(x1=-2.0,x2=2.0,y1=-2.0,y2=2.0,fractgenerator=genfractfr
 """default values are all reasonable, should only need to change whats specific for use case 
 f can be given as a sympy expression, string that parses to sympy, or calleable function pared with fprime"""
 def drawnewtontypefractal(x1=-2.0,x2=2.0,y1=-2.0,y2=2.0,fractgenerator=newtonsfractalfornjit
-    ,iterator=newtonsmethod,f="x**2-x+1+x**5",fprime=None,npoints=1000, maxdepth=200,plottype="imshow",cmap="Dark2"):
+    ,iterator=newtonsmethod,f="x**3+1+x**5",fprime=None,npoints=1000, maxdepth=200,plottype="imshow",cmap="Dark2"):
     if type(f)==type("string"):
         f=parse_expr(f)
     if str(type(type(f)))=="<class 'sympy.core.assumptions.ManagedProperties'>":#checks if sympy expression, need 2 types as different types of sympy expressions
@@ -418,11 +420,12 @@ if __name__ == '__main__':
     res = 1000
     maxdepth = 200
    
-    starttime = timeit.default_timer()
+    
     
 
-    #drawStabilityFractal(f=exponential,npoints=4000,maxdepth=200,ncycles=64)
-    drawnewtontypefractal()
+    
+    drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)
+    #drawnewtontypefractal()
    
     
     #f=x**2-x+1+x**5#example of seed for Newton fractal
