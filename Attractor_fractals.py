@@ -82,7 +82,8 @@ if __name__ == '__main__':
     extent = (-2,2,-2,2)
     fig, ax = plt.subplots()
     n = 100
-    img=rangeimage(res,extent,n=n)
+    #img=rangeimage(res,extent,n=n)
+    img=compute_and_plot()
     ax.imshow(img,extent=extent)
     """fig, ax = plt.subplots(2,2)
     n = 120

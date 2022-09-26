@@ -424,8 +424,8 @@ if __name__ == '__main__':
     
 
     
-    drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)
-    #drawnewtontypefractal()
+    #drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)
+    drawnewtontypefractal()
    
     
     #f=x**2-x+1+x**5#example of seed for Newton fractal
