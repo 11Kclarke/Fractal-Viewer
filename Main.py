@@ -419,13 +419,19 @@ if __name__ == '__main__':
     a,b,c,d = sp.symbols('a,b,c,d')
     res = 1000
     maxdepth = 200
-   
-    
-    
+    f=x**2+x**3-1
+    fp=f.diff(x)
+    f=njit(sp.lambdify(x,f))
+    fp=njit(sp.lambdify(x,fp))
+    A=np.linspace(3,6,10,dtype=np.float32)
+    B=A
+    for i,val in enumerate(A):
+        B[i]=newtonsmethod(f,fp,val)
+    print(B)
 
     
     #drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)
-    drawnewtontypefractal()
+    #drawnewtontypefractal()
    
     
     #f=x**2-x+1+x**5#example of seed for Newton fractal

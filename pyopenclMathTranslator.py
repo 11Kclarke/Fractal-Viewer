@@ -22,9 +22,9 @@ def isvalidsymbol(line,symbols):#is only a valid symbol if its a number or a var
         return True
     else:
         return False
-operations = ["^"]
-operationsOrig = ["base^arg"]
-replacements = ["pow( base , arg )"]
+operations = ["^","/","*","+","-"]
+operationsOrig = ["base^arg","base*arg","base+arg","base-arg","base/arg"]
+replacements = ["dtype_powr( base , arg )","dtype_divide( base , arg)","dtype_mul( base , arg )","dtype_add( base , arg)","dtype_add( base , -arg)"]
 outputprogram=""
 outputatoms = []
 def getargs(operation,atom,symbols):
@@ -57,6 +57,8 @@ def getargs(operation,atom,symbols):
     return arg,base
 
 
+
+
 """This is pretty shit and also a big mess rn
 To do somthing for dealing with multiplication that doesnt break powers, i think rn A**n * B**m would break
 needs to split 2 atoms multiplied A*B --> A * B without A**B --> A* *B"""
@@ -84,9 +86,14 @@ def translate(fl,operations=operations,operationsOrig=operationsOrig,outputarg =
         fsSplit=re.split(" |\*",fs[i])#in general sp.lamdify splits different operations by spaces, the main exception is two atoms multiplied
         #print(fsSplit)
         outputatoms.append([])#each row is a list of all opencl representations, of every operation in line
+        
         for k in range(len(operations)):#list of operations that need replacing
-            for atom in fsSplit:#example atom n*var**m
+            for c, atom in enumerate(fsSplit):#example atom n*var**m
                 if operations[k] in atom:
+                    if atom == operations[k]:
+                        atom = workingfssplit[c-1]+" "+atom+" "+workingfssplit[c+1]
+                    print(operations[k])
+                    print("in")
                     print(atom)            
                     arg,base=getargs(operations[k],atom,symbols)
                     print(arg,base)
@@ -98,6 +105,7 @@ def translate(fl,operations=operations,operationsOrig=operationsOrig,outputarg =
                         tobereplaced=tobereplaced.replace("arg",arg)
                         symbols.append(replacement)
                         workingfs=workingfs.replace(tobereplaced,replacement)
+                        workingfssplit= re.split(" |\*",workingfs.splitlines()[i-1])#should be split same as fssplit but will contain updates
                         #break
                     else:
                         print("\n\nFailed to find arg and base \n\n")
@@ -107,7 +115,7 @@ def translate(fl,operations=operations,operationsOrig=operationsOrig,outputarg =
     
 
 
-def subsfunction(f,code,name):
+def subsfunction(f,code,name,RemoveSemiColon=True):
     originalargs=[]
     sig,func=f
     sig=sig.split(',')
@@ -121,56 +129,82 @@ def subsfunction(f,code,name):
             assert len(originalargs)==len(inbetweenbrackets)
             for i in zip(originalargs,inbetweenbrackets):#replaces args in function def with arg in location
                 func=func.replace(*i)
+            if RemoveSemiColon:
+                func=func.replace(";","")    
             code=code.replace(f"__{split}__",func)
             
         
         
         
     return code
+""" 
+printf("X: %f",X[i]);
+printf("Fval: %f",fval);
+printf("tol: %f",precision);
+printf("itt count: %i, itt lim: %i",C,N);
+fval=__f(X[i])__;
+fpval=__fprime(X[i])__;
+  """
 #printf("%f",fval);
 NewtonsMethod="""
 int C = 0;
-float fval=1000;
-while (fval>precision && C<N) 
+cdouble_t fval;
+cdouble_t fpval;
+fval.real=100;
+fpval.real=100;
+fval.imag=100;
+fpval.imag=100;
+
+while ((fval.real*fval.real+fval.imag*fval.imag)>precision && C<N) 
 {
-  fval=__f(X[i])__
+    
   
-  X[i] =X[i] - fval/__fprime(X[i])__ 
+    
+   
   
   C+=1;
-}"""
 
-dtype="float"
+}
+
+
+"""
+map="""
+cdouble_t fval = {100,100};
+
+X[i] = cdouble_addr(fval,-1)"""
+my_struct = cl.tools.get_or_register_dtype("cdouble_t", np.complex128)
+dtype="cdouble"
+
 funcdefmarker="def _lambdifygenerated"
 xbig,y=sp.symbols("xbig,y")
-f=xbig**2+xbig**3-1
+f=xbig**2+xbig**3-1.0+xbig
 
 fp = sp.diff(f)
 fl=sp.lambdify((xbig),f)
 
-fprimel=sp.lambdify(xbig,fp)
-flt=translate(fl)
-fprimelt = translate(fprimel)
+#fprimel=sp.lambdify(xbig,fp)
+#flt=translate(fl)
+#fprimelt = translate(fprimel)
 print(f)
 print(fp)
 print("into:")
-print(NewtonsMethod)
+#print(NewtonsMethod)
 print("\n")
-fsubbed = subsfunction(flt,NewtonsMethod,"f")
-print(fsubbed)
-mapclstr=subsfunction(fprimelt,fsubbed,"fprime")
-
-print(mapclstr)
+#fsubbed = subsfunction(flt,NewtonsMethod,"f")
+#print(fsubbed)
+#mapclstr=subsfunction(fprimelt,fsubbed,"fprime")
+#mapclstr=mapclstr.replace("dtype",dtype)
+#print(mapclstr)
 os.environ["PYOPENCL_CTX"]="0"
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 
 ctx = cl.create_some_context()
 queue = cl.CommandQueue(ctx)
 
-A=np.linspace(3,6,10,dtype=np.float32)
+A=np.linspace(3,6,1,dtype=np.complex128)#1val for easy testing
 res_g = cl.array.to_device(queue, A)
-mapcl = ElementwiseKernel(ctx,"float *X,int N,float precision",mapclstr,"mapcl")
-mapcl(res_g,np.intc(100),np.float32(0.0000001)) 
+mapcl = ElementwiseKernel(ctx,"cdouble_t *X,int N,double precision",map,"map",preamble="#define PYOPENCL_DEFINE_CDOUBLE //#include <pyopencl-complex.h>  ")
+mapcl(res_g,np.intc(500),np.float64(0.00001)) 
 print(res_g.get())
 
 
