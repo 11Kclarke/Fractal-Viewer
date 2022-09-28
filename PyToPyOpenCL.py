@@ -16,13 +16,7 @@ import re
 
 
 
-def isvalidsymbol(line,symbols):#is only a valid symbol if its a number or a variable seen in signature
-    if isinstance(line,list):
-        line="".join(line) 
-    if line in symbols or line.isnumeric():
-        return True
-    else:
-        return False
+
 #must obey order of operations
 operations1arg=["-"]
 operations2arg = ["^","/","*","+"]
@@ -122,12 +116,13 @@ def dtyper(operation):#adds the r in the right place to use correct function cal
    
     return operation
 
-def translate(fl,operations=operations2arg,outputarg = "",dtype="cdouble_"):
-    print(inspect.getsource(fl))
+def translate(fl,operations=operations2arg,replacements2arg=replacements2arg,outputarg = "",dtype="cdouble_",returnsig=True):
+    if isinstance(fl,str):
+        fl=sp.lamdify(fl)
     fsorig=inspect.getsource(fl)
     fsorig=fsorig.replace("**","^")#a special case poor solution, to deal with difficulty seperating * from **
     fsorig=fsorig.replace("- ","+-")#should do this for all 1arg funcs
-    print(fsorig)
+    sig=makesig(fsorig.split("\n",1)[0],dtype)
     workingfs  = fsorig.split("\n",1)[1]
     workingfs = workingfs.replace("return"," ")
     for j,opp in enumerate(operations1arg):
@@ -151,13 +146,17 @@ def translate(fl,operations=operations2arg,outputarg = "",dtype="cdouble_"):
         
         else:
             c+=1
+    if returnsig: 
+        return sig, workingfs 
+    else:
+        return workingfs
     
-    return workingfs
 
 def subsfunction(f,code,name,RemoveSemiColon=True):
     originalargs=[]
     sig,func=f
-    sig=sig.split(',')
+    
+    #sig=sig.split(',')
     for i in sig:#gets all variable names required for function being subbed
         originalargs.append(i.split(" ")[1])
     codesplit = code.split("__")
@@ -165,9 +164,12 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
         if split.split("(")[0] == name:#split here will be the function name and its input eg "f(x)"
             inbetweenbrackets=split.split("(")[1].split(")")[0].split(",")
             #split 1 gets after first bracket, split to gets rid of after bracket, then forms list of each arg
+            #inbetweenbrackets is equal to the list of argument names in function locations 
+            #eg subbing somthing into __f(a,b)__ inbetween brackets would be ["a","b"]
             assert len(originalargs)==len(inbetweenbrackets)
             for i in zip(originalargs,inbetweenbrackets):#replaces args in function def with arg in location
                 func=func.replace(*i)
+            
             if RemoveSemiColon:
                 func=func.replace(";","")    
             code=code.replace(f"__{split}__",func)

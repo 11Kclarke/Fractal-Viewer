@@ -129,6 +129,7 @@ def polyderiv(x):
 def newtonsfractalfornjit(x1,x2,y1,y2,npoints=600, maxdepth=80,tol=1e-6,iterator=newtonsmethod,Nroots=None):#,f=None,dydx=None):
     #print(type(tol))
     #print(str(tol))
+    
     tol=(((x1-x2)/npoints)**2+((y1-y2)/npoints)**2)/4
     N=int(np.log10(tol))
     flatroots = np.ones((npoints,npoints),dtype=np.float64).flatten()#cannot be dtype complex as it will break the colouringa
@@ -419,19 +420,11 @@ if __name__ == '__main__':
     a,b,c,d = sp.symbols('a,b,c,d')
     res = 1000
     maxdepth = 200
-    f=x**2+x**3-1
-    fp=f.diff(x)
-    f=njit(sp.lambdify(x,f))
-    fp=njit(sp.lambdify(x,fp))
-    A=np.linspace(3,6,10,dtype=np.float32)
-    B=A
-    for i,val in enumerate(A):
-        B[i]=newtonsmethod(f,fp,val)
-    print(B)
-
+    f=x**3-1
+    
     
     #drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)
-    #drawnewtontypefractal()
+    drawnewtontypefractal(f=f,npoints=2000,x1=-1,x2=1,y1=-1,y2=1)
    
     
     #f=x**2-x+1+x**5#example of seed for Newton fractal

@@ -1,13 +1,9 @@
 import numpy as np
 import pyopencl as cl
 import pyopencl.array
-import pandas as pd
 from pyopencl.elementwise import ElementwiseKernel
-import datashader as ds
 import os
 import matplotlib.pyplot as plt
-from numba import jit,prange,njit
-import timeit
 import sympy as sp
 import inspect
 import re
@@ -142,11 +138,11 @@ printf("X: %f",X[i]);
 printf("Fval: %f",fval);
 printf("tol: %f",precision);
 printf("itt count: %i, itt lim: %i",C,N);
-fval=__f(X[i])__;
-fpval=__fprime(X[i])__;
+
   """
 #printf("%f",fval);
 NewtonsMethod="""
+
 int C = 0;
 cdouble_t fval;
 cdouble_t fpval;
@@ -154,16 +150,12 @@ fval.real=100;
 fpval.real=100;
 fval.imag=100;
 fpval.imag=100;
-
 while ((fval.real*fval.real+fval.imag*fval.imag)>precision && C<N) 
 {
-    
-  
-    
-   
-  
+    fval=__f(X[i])__;
+    fpval=__fprime(X[i])__; 
+    X[i]= dtype_add(X[i],dtype_neg(dtype_divide(fval,fpval)))
   C+=1;
-
 }
 
 
