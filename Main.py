@@ -1,6 +1,7 @@
 import sys
 print(sys.version)
 from tokenize import Exponent
+import PyopenclNewtonsFractal
 from matplotlib.transforms import Transform
 import numpy as np
 import matplotlib.pyplot as plt
@@ -82,7 +83,7 @@ def cycledetector(ys,D,cycles,j):
 
 
 @njit(fastmath = True)
-def newtonsmethod(f,fprime,x0,tol=1e-6,N=4,maxdepth=500):#,f=None,fprime=None):
+def newtonsmethod(f,fprime,x0,tol=1e-16,N=4,maxdepth=500):#,f=None,fprime=None):
     #print(f)
     #print(fprime)
     #print(N)
@@ -96,41 +97,17 @@ def newtonsmethod(f,fprime,x0,tol=1e-6,N=4,maxdepth=500):#,f=None,fprime=None):
             #preferably as different as possible from the other roots
             #this is required as matplotlib canot colourise complex numbers
             return root
-    return -1 
-"""
-@vectorize(nopython=True,fastmath = True)
-def vectnewtonsmethod(x0,tol=1e-6,N=4,maxdepth=500):#,f=None,fprime=None):
-    #print(f)
-    #print(fprime)
-    #print(N)
-    #print(tol)
-    x=x0+0j
-    for i in range(maxdepth):
-        x=x-f(x)/fprime(x)
-        if abs(f(x))<tol:
-            root=np.float64(round(abs(x.real+x.imag),-(N+2)))#convert to real number that is different from its complex conjugate
-            #root = np.float64(int(abs(x.real+x.imag)*10**-(N+1))*10**-(N+1))
-            #preferably as different as possible from the other roots
-            #this is required as matplotlib canot colourise complex numbers
-            return np.float64(root)
-    return np.float64(-1) 
-"""
+    return 0 
+
    
  
 
-@njit("complex128(complex128)",fastmath=True)
-def poly(x):
-    return x**3+2*x**2+1j*x-10
-@njit("complex128(complex128)",fastmath=True)
-def polyderiv(x):
-    return 3*x**2+4*x+1j
-
 @njit(fastmath = True,parallel=True,nogil = True)
-def newtonsfractalfornjit(x1,x2,y1,y2,npoints=600, maxdepth=80,tol=1e-6,iterator=newtonsmethod,Nroots=None):#,f=None,dydx=None):
+def newtonsfractalfornjit(x1,x2,y1,y2,npoints=600, maxdepth=80,tol=1e-16,iterator=newtonsmethod,Nroots=None):#,f=None,dydx=None):
     #print(type(tol))
     #print(str(tol))
     
-    tol=(((x1-x2)/npoints)**2+((y1-y2)/npoints)**2)/4
+    #tol=(((x1-x2)/npoints)**2+((y1-y2)/npoints)**2)/4
     N=int(np.log10(tol))
     flatroots = np.ones((npoints,npoints),dtype=np.float64).flatten()#cannot be dtype complex as it will break the colouringa
     extent = [x1,x2,y1,y2]
@@ -139,7 +116,7 @@ def newtonsfractalfornjit(x1,x2,y1,y2,npoints=600, maxdepth=80,tol=1e-6,iterator
     
     #put in 1 loop as it parralelizes easier
     for c in prange(0,npoints*npoints):
-            flatroots[c]=iterator(xvals[c//npoints]+yvals[c%npoints],Tol=tol,N=N)
+            flatroots[c]=iterator(xvals[c//npoints]+yvals[c%npoints],tol=tol,N=N)
             #flatroots[c]=iterator(xvals[c//npoints]+yvals[c%npoints])       
     #for this algorithm to work difference between roots needs to be greater then difference between different copies of same root
     #this wont be fulfilled in the case of stacked roots for example X^5 has 5 roots exactly at 0 and will find 5 different rounding errors
@@ -260,8 +237,8 @@ def plotfract(cmap,stabilities=None,extent=None,plottype=None,ax=None,shape=None
             print(plottype,"is not a valid plot type")
         return cmap
 
-#genfractfromvertex(func,0,1,0,1,npoints=500, maxdepth=150,complex=True,recurse=recurse)
-def Draw(stabilities,extent,generator = genfractfromvertexfornjit,plottype="imshow",cmap="tab10",Grid=False,plotfunc=plotfract):
+#should prolly be a class
+def GUI(stabilities,extent,generator = genfractfromvertexfornjit,plottype="imshow",cmap="viridis",Grid=False,plotfunc=plotfract):
     
     fig, ax = plt.subplots()
     ax.set_aspect("auto")
@@ -274,11 +251,11 @@ def Draw(stabilities,extent,generator = genfractfromvertexfornjit,plottype="imsh
     shape=np.shape(stabilities)
     #over use of kwargs so it can be easily caleable from buttom press
     #ax.imshow(stabilities,extent=extent,origin='lower')
-    print(cmap)
+    
     cmap=plotfunc(cmap,stabilities,extent,plottype,ax,shape)
     print(cmap)
     def on_press(event):
-        nonlocal cmap
+        nonlocal cmap#ewww
         sys.stdout.flush()
         #print(event.key)
         if event.key == 'h':
@@ -349,11 +326,15 @@ def Draw(stabilities,extent,generator = genfractfromvertexfornjit,plottype="imsh
     text_box = TextBox(axbox, "Colour map:", textalignment="center")
     text_box.on_submit(onsubmit)
     text_box.set_val(cmap)  # Trigger `submit` with the initial string.
+    plt.show(block=True)    
+
+def DrawNewtonsfractalOpencl(x1,x2,y1,y2,fl,fprimel,npoints=1000, maxdepth=200,tol=1e-16):
+    innerwrap = PyopenclNewtonsFractal.WrapperOpenCltoDraw(x1,x2,y1,y2,fl,fprimel,npoints=npoints, maxdepth=maxdepth,tol=1e-16)
+    Roots,extent=innerwrap(x1,x2,y1,y2)
+    GUI(Roots,extent,innerwrap)
 
     
     
-    
-    plt.show(block=True)    
 
 """wraps lamdified sympy fuyntions so that they can be pickled
 def wrapperforpickle(func):
@@ -370,33 +351,37 @@ def drawStabilityFractal(x1=-2.0,x2=2.0,y1=-2.0,y2=2.0,fractgenerator=genfractfr
         return iterator(function, maxdepth, value,D,divergencedetector=divergencedetector,cycledetector=cycledetector,cycles=ncycles,divlim=divlim)
     stabilities,startbounds=fractgenerator(f,x1,x2,y1,y2,npoints=npoints,maxdepth=maxdepth,iterator=prepiterator)#gens first view
     cov = covfunc1thread(f=f,npoints=res,maxdepth = maxdepth,iterator=prepiterator,fractgenerator=fractgenerator)#integrates options into gen
-    Draw(stabilities,startbounds,generator=cov,plottype=plottype,cmap=cmap)#draws view and incorperates gen, for zooming
+    GUI(stabilities,startbounds,generator=cov,plottype=plottype,cmap=cmap)#draws view and incorperates gen, for zooming
 
 """default values are all reasonable, should only need to change whats specific for use case 
 f can be given as a sympy expression, string that parses to sympy, or calleable function pared with fprime"""
 def drawnewtontypefractal(x1=-2.0,x2=2.0,y1=-2.0,y2=2.0,fractgenerator=newtonsfractalfornjit
-    ,iterator=newtonsmethod,f="x**3+1+x**5",fprime=None,npoints=1000, maxdepth=200,plottype="imshow",cmap="Dark2"):
+    ,iterator=newtonsmethod,f="x**3+1+x**5",fprime=None,npoints=1000, maxdepth=200,tol=1e-16
+    ,plottype="imshow",cmap="Dark2",ftype="Opencl"):
+    
     if type(f)==type("string"):
         f=parse_expr(f)
-    if str(type(type(f)))=="<class 'sympy.core.assumptions.ManagedProperties'>":#checks if sympy expression, need 2 types as different types of sympy expressions
+    if isinstance(f,sp.Basic):#checks if sympy expression, need 2 types as different types of sympy expressions
         fprime = sp.diff(f,x)
         f=sp.lambdify(x,f,"numpy")
         fjit=njit(nopython=True,fastmath=True,locals={"x":complex128})(f)
         fprime=sp.lambdify(x,fprime,"numpy")
-        fprimejit=njit(nopython=True,fastmath=True,locals={"x":complex128})(fprime)
+        fprimejit=njit(nopython=True,fastmath=True,locals={"x":complex128})(fprime)        
     else:
         fjit=vectorize(nopython=True,fastmath=True,locals={"x":complex128})(f)
         fprimejit=vectorize(nopython=True,fastmath=True,locals={"x":complex128})(fprime)
     assert callable(fjit)
     assert callable(fprimejit)
-    tol=(((x1-x2)/npoints)**2+((y1-y2)/npoints)**2)/4
+    if tol==None:
+        tol=(((x1-x2)/npoints)**2+((y1-y2)/npoints)**2)/4
+    
     @njit
-    def prepiterator(X0,N,Tol):
-        return iterator(fjit,fprimejit,X0,tol=Tol,N=N,maxdepth=maxdepth)
+    def prepiterator(X0,N,tol):
+        return iterator(fjit,fprimejit,X0,tol=tol,N=N,maxdepth=maxdepth)
     def prepfractgen(x1,x2,y1,y2):
         return fractgenerator(x1,x2,y1,y2,npoints=npoints, maxdepth=maxdepth,tol=tol,iterator=prepiterator)
     stabilities,startbounds=fractgenerator(x1,x2,y1,y2,npoints=npoints,maxdepth=maxdepth,iterator=prepiterator) 
-    Draw(stabilities,startbounds,generator=prepfractgen,plottype=plottype,cmap=cmap)#draws view and incorperates gen, for zooming
+    GUI(stabilities,startbounds,generator=prepfractgen,plottype=plottype,cmap=cmap)#draws view and incorperates gen, for zooming
 
 """ReadMe:
 Easiest way to use is the 2 functions directly above Drawnewtontypefractal and draw stabilitytypefractal. you can simply run these with there defaults
@@ -408,9 +393,6 @@ use calleable complex function. Later should take sympy equation. Newton types a
 
 Draw draws a fractal. For draw to be able to Redraw after zoom it needs to be passed pairing
 of gen and seed, as well as the original image.
-
-covfunc is a function wrapper that outputs a generator seed pairing, and wraps it together with all options set,
-so it can be passed to Draw without draw needing to be passed all of the generation options.
 """
 
 if __name__ == '__main__':
@@ -420,12 +402,16 @@ if __name__ == '__main__':
     a,b,c,d = sp.symbols('a,b,c,d')
     res = 1000
     maxdepth = 200
-    f=x**3-1
+    f=x**4-1+x
+    fp=sp.diff(f)
+    fl=sp.lambdify(x,f)
+    fpl=sp.lambdify(x,fp)
     
+    DrawNewtonsfractalOpencl(-1,1,-1,1,fl,fpl,npoints=1000,maxdepth=1000)
     
     #drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)
-    drawnewtontypefractal(f=f,npoints=2000,x1=-1,x2=1,y1=-1,y2=1)
-   
+    #drawnewtontypefractal(f=f,npoints=1000,x1=-1,x2=1,y1=-1,y2=1)
+    
     
     #f=x**2-x+1+x**5#example of seed for Newton fractal
     

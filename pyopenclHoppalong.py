@@ -141,12 +141,11 @@ def AttractorExplorer(x1,x2,y1,y2,N,mapclstr,SideLength,Res2 = 400,N2=50000,args
         mapclstr[1] = mapclstr[1].replace("float","double")
         ctx = cl.create_some_context()
         queue = cl.CommandQueue(ctx)
-        mapcl = [ElementwiseKernel(ctx,*mapclstr,"mapcl"),cl.create_some_context(),cl.CommandQueue(ctx)]
+        mapcl = [ElementwiseKernel(ctx,*mapclstr,"mapcl"),cl.create_some_context(),queue]
     else:    
         ctx = cl.create_some_context()
         queue = cl.CommandQueue(ctx)
-        
-        mapcl = [ElementwiseKernel(ctx,*mapclstr,"mapcl"),cl.create_some_context(),cl.CommandQueue(ctx)]
+        mapcl = [ElementwiseKernel(ctx,*mapclstr,"mapcl"),cl.create_some_context(),queue]
     
     plt.ion()
     extent = [x1,x2,y1,y2]

@@ -55,6 +55,8 @@ def GetArg(arg,r=False):
             break
     if r: arg=arg[::-1]
     return arg
+
+
 def apply1ArgOps(operation,replacement,opp):
     arg=GetArg(operation[1:]).strip()
     regexp = re.compile(r"^(-?\d+)(\.\d*)?$")
@@ -88,32 +90,31 @@ def dtyper(operation):#adds the r in the right place to use correct function cal
     lhs=operation.find("_")
     rhs=operation.find("(")
     
-    regexp = re.compile(r"^(-?\d+)(\.\d*)?$")
+    regexp = re.compile(r"^(-?\d+)(\.\d*)?$")#regex to check for number currently rejects .123 but 0.123 is fine
     centralcommaindex=0
     bracketcount=0
     lowestbracketcomma=9999
-    print(operation)
+    #print(operation)
         
     if operation.count(",")>1:
         for i,val in enumerate(operation[rhs+1:]):#finds comma surounded by least brackets 
             if val==")":bracketcount-=1
             if val=="(":bracketcount+=1
             if val=="," and bracketcount<lowestbracketcomma:
-                print(bracketcount)
+                #print(bracketcount)
                 centralcommaindex=i
                 lowestbracketcomma=bracketcount       
         args=(operation[rhs+1:operation.rfind(")")][:centralcommaindex],
             operation[rhs+1:operation.rfind(")")][centralcommaindex+1:])#split whats between first opening bracket and last closing bracket by comma in least brackets
     else:
         args=(operation[rhs+1:operation.find(")")].split(","))
-    print(f"split into {args}")        
+    #print(f"split into {args}")        
     assert not (regexp.search(args[0]) and regexp.search(args[1]))#no variable should have been simplified
     #regex to check for number currently rejects .123 but 0.123 is fine
     if bool(regexp.search(args[0])):
         operation = operation[:lhs+1]+"r"+operation[lhs+1:]
     if bool(regexp.search(args[1])):
-        operation = operation[:rhs]+"r"+operation[rhs:]
-   
+        operation = operation[:rhs]+"r"+operation[rhs:]   
     return operation
 
 def translate(fl,operations=operations2arg,replacements2arg=replacements2arg,outputarg = "",dtype="cdouble_",returnsig=True):
@@ -121,10 +122,11 @@ def translate(fl,operations=operations2arg,replacements2arg=replacements2arg,out
         fl=sp.lamdify(fl)
     fsorig=inspect.getsource(fl)
     fsorig=fsorig.replace("**","^")#a special case poor solution, to deal with difficulty seperating * from **
-    fsorig=fsorig.replace("- ","+-")#should do this for all 1arg funcs
+    fsorig=fsorig.replace("- ","+-")#should do this for all 1arg funcs, however many like sin and cos or log would already have a + or - infront
     sig=makesig(fsorig.split("\n",1)[0],dtype)
     workingfs  = fsorig.split("\n",1)[1]
     workingfs = workingfs.replace("return"," ")
+    
     for j,opp in enumerate(operations1arg):
         start=0
         c=workingfs.count(opp)#to avoid confusion editing variable while iterating
@@ -132,9 +134,16 @@ def translate(fl,operations=operations2arg,replacements2arg=replacements2arg,out
         for i in range(c):
             index=workingfscopy[start:].find(opp)
             replacement,arg=apply1ArgOps(workingfscopy[index+start:],replacements1arg[j],opp)#if arg is numeric this func will return its input
-            print(f"replaced {opp+arg}, with {replacement}")
+            #print(f"replaced {opp+arg}, with {replacement}")
             workingfs=workingfs.replace(opp+arg,replacement).replace("dtype_",dtype)
             start=index+1
+    if "*1j" in workingfs:#any complex constant will contain *1j eg 21*1j
+        Coef=GetArg(workingfs[:workingfs.find("*1j")],r=True)
+        genimag ="(dtype_t){0,arg}"#this is general for of complex constant for C complex libary being used
+        #Took Fucking ages to work out how to do this apparently its called a compound literal whatever the fuck that means
+        substitution=genimag.replace("arg",Coef).replace("dtype_",dtype)
+        workingfs=workingfs.replace(Coef+"*1j",substitution)
+        #print("replaced "+Coef+"*1j"+", with"+substitution)#for some reason f string wouldnt do this 
     c=0
     while c<len(operations):
         if operations[c] in workingfs:
@@ -182,7 +191,7 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
 if __name__ == '__main__':#for testing not really intedned to be ran
     
     xbig,y=sp.symbols("xbig,y")
-    f=xbig**2-xbig**3-1.0+xbig
+    f=xbig**2-xbig**3-1.0+xbig+21j
 
     fp = sp.diff(f)
     fl=sp.lambdify((xbig),f)
