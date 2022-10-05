@@ -16,17 +16,15 @@ mapclstr="""
 int C = 0;
 cdouble_t fval;
 cdouble_t fpval;
-fval.real=100;
-fpval.real=100;
-fval.imag=100;
+fval.real=1.0;
+fpval.real=1.0;
+fval.imag=1.00;
 fpval.imag=0;
 
-while ((fval.real*fval.real+fval.imag*fval.imag)>precision && C<N) 
-{
+
     
-  fval=cdouble_pow(fval,(1,1j));
-  C+=1;
-} 
+X[i]=cdouble_add(fval,(cdouble_t){0,1.0});
+
 """
 
 ctx = cl.create_some_context()

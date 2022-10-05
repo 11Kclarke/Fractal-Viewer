@@ -43,6 +43,8 @@ def iterateSavememory(Consts, Xs, Ys, resY, resX,mapcl,N,SideLength,precompiled)
         mapcl(*Consts, Xs, Ys, resY, resX)
         Hoppalongiterations[i] =  [resX.get(),resY.get()]
     return Hoppalongiterations
+
+
 def iterateOpencl(x1,x2,y1,y2,N,mapclstr,SideLength,args = np.array([2.0,1.0,0.0],dtype =np.float32),iterator=iteratefast,dtype=np.float32):
     precompiled=False
     if str(type(mapclstr[0]))=="<class 'pyopencl.elementwise.ElementwiseKernel'>":
@@ -127,6 +129,24 @@ def prepdata(Hoppalongiterations,SideLength,width=200,height=200):
             rangs[j]=(np.max(agg[j,:])-np.min(agg[j,:]))#+np.sum(np.max(agg[:,j])-np.min(agg[:,j]))
         resultrange[i%SideLength,i//SideLength] = np.sum(rangs)#np.sum(np.ptp(agg,axis=1))+np.sum(np.ptp(agg,axis=0))
     return resultrange
+
+@njit(parallel=True)
+def prepdata2(Hoppalongiterations,SideLength,width=200,height=200):
+    resultrange=np.zeros((SideLength,SideLength))
+    count=0
+    for i in prange((SideLength**2)):
+        count+=1
+        
+        if count%20000 == 0 and not i==0:
+            print((count/SideLength**2)*100)
+            print("%")
+            
+        rangs = np.zeros(width,dtype=np.float32)
+        for j in range(1,len(Hoppalongiterations[i,0,:])):
+            rangs[j]=(np.sum(Hoppalongiterations[i,:,j]-Hoppalongiterations[i,:,j-1]))
+        resultrange[i%SideLength,i//SideLength] = np.sum(rangs)#np.sum(np.ptp(agg,axis=1))+np.sum(np.ptp(agg,axis=0))
+    return resultrange
+
 
 def AttractorExplorer(x1,x2,y1,y2,N,mapclstr,SideLength,Res2 = 400,N2=50000,args = np.array([2.0,1.0,0.0],dtype =np.float32),iterator=iteratefast,dtype=np.float32):
     from matplotlib import gridspec
@@ -213,19 +233,21 @@ if __name__ == '__main__':
     Xs[i]=resX[i];
     Ys[i]=resY[i];
     """]
-    
-    #Hoppalongiterations =iterateOpencl(0,0,0,0,10000,mapclstr,1)
+    print("Reeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
+    Hoppalongiterations =iterateOpencl(-1,1,-1,1,10,mapclstr,1000)
     #Hoppalongiterations = points(Hoppalongiterations[:,0],Hoppalongiterations[:,1],500,500)
+    print("Reeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
+    Hoppalongiterations=prepdata2(Hoppalongiterations,200)
     #Hoppalongorbit = iterateOpencl(0,0,0,0,10000,mapclstr,1)
     #rbit= points(Hoppalongiterations[:,0],Hoppalongiterations[:,1],500,500)
-    #fig, ax = plt.subplots()
+   
     #resultrange = prepdata(Hoppalongiterations,SideLength)
     #print(time-timeit.default_timer())
-    #ax.imshow(Hoppalongiterations)
+    plt.imshow(Hoppalongiterations)
     #ax.imshow(resultrange,extent=extent)
-    #plt.show()
+    plt.show()
     
-    AttractorExplorer(x1,x2,y1,y2,50,mapclstr,SideLength)
+    #AttractorExplorer(x1,x2,y1,y2,50,mapclstr,SideLength)
 
 
 

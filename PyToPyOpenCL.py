@@ -90,7 +90,7 @@ def dtyper(operation):#adds the r in the right place to use correct function cal
     lhs=operation.find("_")
     rhs=operation.find("(")
     
-    regexp = re.compile(r"^(-?\d+)(\.\d*)?$")#regex to check for number currently rejects .123 but 0.123 is fine
+    regexp = re.compile(r"^(-?\d+)(\.\d*)?$")#regex to check for number currently rejects .123 but 0.123 is fine 
     centralcommaindex=0
     bracketcount=0
     lowestbracketcomma=9999

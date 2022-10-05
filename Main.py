@@ -329,10 +329,19 @@ def GUI(stabilities,extent,generator = genfractfromvertexfornjit,plottype="imsho
     plt.show(block=True)    
 
 def DrawNewtonsfractalOpencl(x1,x2,y1,y2,fl,fprimel,npoints=1000, maxdepth=200,tol=1e-16):
-    innerwrap = PyopenclNewtonsFractal.WrapperOpenCltoDraw(x1,x2,y1,y2,fl,fprimel,npoints=npoints, maxdepth=maxdepth,tol=1e-16)
+    if isinstance(fl,str):
+        fl=parse_expr(fl)
+        fp=sp.diff(f)
+        fl=sp.lambdify(x,f)
+        fprimel=sp.lambdify(x,fp)
+    if fprimel==None:
+        fp=sp.diff(f)
+        fl=sp.lambdify(x,f)
+        fprimel=sp.lambdify(x,fp)
+    innerwrap = PyopenclNewtonsFractal.WrapperOpenCltoDraw(x1,x2,y1,y2,fl,fprimel,npoints=npoints, maxdepth=maxdepth,tol=tol)
     Roots,extent=innerwrap(x1,x2,y1,y2)
     GUI(Roots,extent,innerwrap)
-
+    
     
     
 
@@ -402,14 +411,14 @@ if __name__ == '__main__':
     a,b,c,d = sp.symbols('a,b,c,d')
     res = 1000
     maxdepth = 200
-    f=x**4-1+x
+    f=x**3+1
     fp=sp.diff(f)
     fl=sp.lambdify(x,f)
     fpl=sp.lambdify(x,fp)
     
-    DrawNewtonsfractalOpencl(-1,1,-1,1,fl,fpl,npoints=1000,maxdepth=1000)
+    #DrawNewtonsfractalOpencl(-1,1,-1,1,fl,fpl,npoints=res,maxdepth=500,tol=1e-6)
     
-    #drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)
+    drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)
     #drawnewtontypefractal(f=f,npoints=1000,x1=-1,x2=1,y1=-1,y2=1)
     
     
