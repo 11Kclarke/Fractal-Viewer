@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import sympy as sp
 from sympy.utilities.lambdify import lambdify
 from sympy.parsing.sympy_parser import parse_expr
-from multiprocessing import Pool
+
 import sys
 import timeit
 import math
@@ -45,20 +45,8 @@ def exponential(Zn,C):
     
     return np.exp(Zn+C)
 
-@njit("complex128(complex128,complex128)",fastmath=True)
-def exponential(Zn,C):
-    pow=2.718
-    return pow**Zn+C
-
-@njit("complex128(complex128,complex128)",fastmath=True)
-def TriginTrig(Zn,C):
-    return np.cos(C+np.sin(Zn))
-
-
-#very cool, but needs to start zoomed
-@njit("complex128(complex128,complex128)",fastmath=True)
-def reciprocalmandlebrot(Zn,C):
-    return 1/(Zn**2+C)
+#some mandlebrot style seed functions
+#checkout seed funcs.py for more
 
 
 
