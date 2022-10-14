@@ -14,18 +14,6 @@ os.environ["PYOPENCL_CTX"]="0"
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 
 
-"""ith x and y should be unique, and map to ith res x res y"""
-
-"""mapcl = ElementwiseKernel(ctx,
-    "float k1,float k2, float k3, float *Xs,float *Ys,float *resY,float *resX",
-    """
-    
-""" resY[i] =k1- Xs[i];
-    resX[i]= Ys[i]-sign(Xs[i])*(sqrt(fabs(k2*Xs[i]-k3)));
-    Xs[i]=resX[i];
-    Ys[i]=resY[i];"""
-""",
-"mapcl")"""
 
 def iteratefast(Consts, Xs, Ys, resY, resX,mapcl,N,SideLength,precompiled):
     #print("optimised for time")
@@ -171,7 +159,7 @@ def AttractorExplorer(x1,x2,y1,y2,N,mapclstr,SideLength,Res2 = 300,N2=40000,args
     plt.ion()
     extent = [x1,x2,y1,y2]
     Hoppalongiterations =iterateOpencl(*extent,N,mapcl,SideLength)
-    resultrange = prepdata(Hoppalongiterations,SideLength)
+    resultrange = prepdataMaxMin(Hoppalongiterations,SideLength)
     
     #Hoppalongiterations = points(Hoppalongiterations[:,0,0],Hoppalongiterations[:,1,0],1000,1000)
     fig=plt.figure()
@@ -311,13 +299,3 @@ if __name__ == '__main__':
 
 
 
-#need to have each y proccessed with each x not just yi with xi
-""""ymap = ElementwiseKernel(ctx,
-    "float k1, float *res_x,float *res_y",
-    """"""res_y[i] =k1- res_x[j]"""""",
-    "ymap")
-
-xmap = ElementwiseKernel(ctx,
-    "float k2, float k3, float *res_x,float *res_y",
-    """""",
-    "xmap")"""

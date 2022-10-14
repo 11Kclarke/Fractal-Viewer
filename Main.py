@@ -404,9 +404,9 @@ if __name__ == '__main__':
     fl=sp.lambdify(x,f)
     fpl=sp.lambdify(x,fp)
     
-    #DrawNewtonsfractalOpencl(-1,1,-1,1,fl,fpl,npoints=res,maxdepth=500,tol=1e-6)
+    DrawNewtonsfractalOpencl(-1,1,-1,1,fl,fpl,npoints=res,maxdepth=500,tol=1e-6)
     
-    drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)
+    #drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)
     #drawnewtontypefractal(f=f,npoints=1000,x1=-1,x2=1,y1=-1,y2=1)
     
     
