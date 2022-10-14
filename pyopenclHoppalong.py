@@ -128,6 +128,19 @@ def prepdata(Hoppalongiterations,SideLength,width=200,height=200):
         resultrange[i%SideLength,i//SideLength] = np.sum(rangs)#np.sum(np.ptp(agg,axis=1))+np.sum(np.ptp(agg,axis=0))
     return resultrange
 
+@njit(parallel=True)
+def prepdata2(Hoppalongiterations,SideLength,width=200,height=200):
+    resultrange=np.zeros((SideLength,SideLength))
+    count=0
+    for i in prange((SideLength**2)-1):
+        count+=1
+        
+        if count%20000 == 0 and not i==0:
+            print((count/SideLength**2)*100)
+            print("%")    
+        resultrange[i%SideLength,i//SideLength] = np.sum(Hoppalongiterations[i,:,:]-Hoppalongiterations[i+1,:,:])#np.sum(np.ptp(agg,axis=1))+np.sum(np.ptp(agg,axis=0))
+    return resultrange
+
 def AttractorExplorer(x1,x2,y1,y2,N,mapclstr,SideLength,Res2 = 400,N2=50000,args = np.array([2.0,1.0,0.0],dtype =np.float32),iterator=iteratefast,dtype=np.float32):
     from matplotlib import gridspec
     if str(type(mapclstr[0]))=="<class 'pyopencl.elementwise.ElementwiseKernel'>":
@@ -214,18 +227,19 @@ if __name__ == '__main__':
     Ys[i]=resY[i];
     """]
     
-    #Hoppalongiterations =iterateOpencl(0,0,0,0,10000,mapclstr,1)
+    Hoppalongiterations =iterateOpencl(*extent,50,mapclstr,SideLength)
+    print(np.shape(Hoppalongiterations))
     #Hoppalongiterations = points(Hoppalongiterations[:,0],Hoppalongiterations[:,1],500,500)
     #Hoppalongorbit = iterateOpencl(0,0,0,0,10000,mapclstr,1)
-    #rbit= points(Hoppalongiterations[:,0],Hoppalongiterations[:,1],500,500)
-    #fig, ax = plt.subplots()
-    #resultrange = prepdata(Hoppalongiterations,SideLength)
+    #orbit= points(Hoppalongiterations[:,0],Hoppalongiterations[:,1],500,500)
+    fig, ax = plt.subplots()
+    resultrange = prepdata2(Hoppalongiterations,SideLength)
     #print(time-timeit.default_timer())
     #ax.imshow(Hoppalongiterations)
-    #ax.imshow(resultrange,extent=extent)
-    #plt.show()
+    ax.imshow(resultrange,extent=extent)
+    plt.show()
     
-    AttractorExplorer(x1,x2,y1,y2,50,mapclstr,SideLength)
+    #AttractorExplorer(x1,x2,y1,y2,50,mapclstr,SideLength)
 
 
 
