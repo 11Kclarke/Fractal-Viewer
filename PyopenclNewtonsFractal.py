@@ -30,12 +30,7 @@ def PrepNewtonsFractalGPU(fl,fprimel,dtype="cdouble_"):
         X[i]= dtype_add(X[i],dtype_neg(dtype_divide(fval,fpval)));
         C+=1;
     }
-    
-    if ((fval.imag+fval.real>thresh) || (fval.imag+fval.real< -1*thresh))
-    {
-        
-        X[i]=defaultval;
-    }
+   
     """
     #printf("has not converged");
     if isinstance(fl,str):
