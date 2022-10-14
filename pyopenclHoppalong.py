@@ -112,36 +112,43 @@ def points(Xs,Ys,XCount,YCount):
 
 
 @njit(parallel=True)
-def prepdata(Hoppalongiterations,SideLength,width=200,height=200):
+def prepdataDiff(Hoppalongiterations,SideLength,Order=2):
+    #hoppalong iterations is all of the points every hoppalong orbit visited so sidelength by side length by Niterations 
     resultrange=np.zeros((SideLength,SideLength))
     count=0
+    progresscheck = int((SideLength**2)/10)
     for i in prange((SideLength**2)):
         count+=1
-        agg=points(Hoppalongiterations[:,0,i],Hoppalongiterations[:,1,i],width,height)
-        if count%20000 == 0 and not i==0:
-            print((count/SideLength**2)*100)
+        if count%progresscheck == 0 and not i==0:#for progress indicator
+            print((count/(SideLength**2))*100*100/8)
             print("%")
-            
-        rangs = np.zeros(width,dtype=np.float32)
-        for j in range(agg.shape[0]):
-            rangs[j]=(np.max(agg[j,:])-np.min(agg[j,:]))#+np.sum(np.max(agg[:,j])-np.min(agg[:,j]))
-        resultrange[i%SideLength,i//SideLength] = np.sum(rangs)#np.sum(np.ptp(agg,axis=1))+np.sum(np.ptp(agg,axis=0))
+        rang=np.sum((np.ediff1d(Hoppalongiterations[:,0,i]))**Order+np.ediff1d(Hoppalongiterations[:,1,i])**Order)
+        resultrange[i%SideLength,i//SideLength] = rang
+    print(np.shape(resultrange))
     return resultrange
 
 @njit(parallel=True)
-def prepdata2(Hoppalongiterations,SideLength,width=200,height=200):
+def prepdataMaxMin(Hoppalongiterations,SideLength,width=200,height=200):
+    #hoppalong iterations is all of the points every hoppalong orbit visited so sidelength by side length by Niterations 
     resultrange=np.zeros((SideLength,SideLength))
     count=0
-    for i in prange((SideLength**2)-1):
+    progresscheck = int((SideLength**2)/10)
+    for i in prange((SideLength**2)):
         count+=1
-        
-        if count%20000 == 0 and not i==0:
-            print((count/SideLength**2)*100)
-            print("%")    
-        resultrange[i%SideLength,i//SideLength] = np.sum(Hoppalongiterations[i,:,:]-Hoppalongiterations[i+1,:,:])#np.sum(np.ptp(agg,axis=1))+np.sum(np.ptp(agg,axis=0))
+        agg=points(Hoppalongiterations[:,0,i],Hoppalongiterations[:,1,i],width,height)#creates density map of locations of ith hoppalong orbit
+        if count%progresscheck == 0 and not i==0:#for progress indicator
+            print((count/(SideLength**2))*100*100/8)
+            print("%")
+            
+        rangs = np.zeros(Hoppalongiterations.shape[0],dtype=np.float32)
+        for j in range(Hoppalongiterations.shape[0]):
+            rangs[j]=(np.max(agg[j,:])-np.min(agg[j,:]))#finds ranges of each jump
+               
+        rang=np.sum(rangs)
+        resultrange[i%SideLength,i//SideLength] = rang#/dist
     return resultrange
 
-def AttractorExplorer(x1,x2,y1,y2,N,mapclstr,SideLength,Res2 = 400,N2=50000,args = np.array([2.0,1.0,0.0],dtype =np.float32),iterator=iteratefast,dtype=np.float32):
+def AttractorExplorer(x1,x2,y1,y2,N,mapclstr,SideLength,Res2 = 300,N2=40000,args = np.array([2.0,1.0,0.0],dtype =np.float32),iterator=iteratefast,dtype=np.float32):
     from matplotlib import gridspec
     if str(type(mapclstr[0]))=="<class 'pyopencl.elementwise.ElementwiseKernel'>":
         mapcl=mapclstr[0]
@@ -154,11 +161,12 @@ def AttractorExplorer(x1,x2,y1,y2,N,mapclstr,SideLength,Res2 = 400,N2=50000,args
         mapclstr[1] = mapclstr[1].replace("float","double")
         ctx = cl.create_some_context()
         queue = cl.CommandQueue(ctx)
-        mapcl = [ElementwiseKernel(ctx,*mapclstr,"mapcl"),cl.create_some_context(),queue]
+        mapcl = [ElementwiseKernel(ctx,*mapclstr,"mapcl"),cl.create_some_context(),cl.CommandQueue(ctx)]
     else:    
         ctx = cl.create_some_context()
         queue = cl.CommandQueue(ctx)
-        mapcl = [ElementwiseKernel(ctx,*mapclstr,"mapcl"),cl.create_some_context(),queue]
+        
+        mapcl = [ElementwiseKernel(ctx,*mapclstr,"mapcl"),cl.create_some_context(),cl.CommandQueue(ctx)]
     
     plt.ion()
     extent = [x1,x2,y1,y2]
@@ -216,28 +224,70 @@ def AttractorExplorer(x1,x2,y1,y2,N,mapclstr,SideLength,Res2 = 400,N2=50000,args
     plt.show(block=True) 
 if __name__ == '__main__':
     time = timeit.default_timer()
-    SideLength = 500
+    SideLength = 1000
     Consts = np.array([2,1,0],dtype =np.float32)
-    extent=np.array([-10,10,-10,10])
+    #extent=np.array([(9 - np.sqrt(17))/8,10,(7+np.sqrt(17))/8,10])
+    #centreofringsapprox=(1.4490920335076216, -0.4735961188883253)
+    centresoffirstlargerings= [(-0.2705627705627691, 5.974025974025977),
+                               (4.761904761904766, 2.8354978354978364),
+                               (7.846320346320351, -2.0887445887445875),
+                               (4.707792207792213, -6.255411255411255),
+                               (-0.2705627705627691, -6.255411255411255),
+                               (-4.491341991341988, -2.1969696969696955),
+                               (-4.491341991341988, 2.7272727272727284)]#found manually by clicking points on graph, not to be trusted 
+    
+    x,y=zip(*centresoffirstlargerings)
+    extent=np.array([-10,10,-10,10])*5
     [x1,x2,y1,y2]=extent
     mapclstr=["float k1,float k2, float k3, float *Xs,float *Ys,float *resY,float *resX","""
     resY[i] =k1- Xs[i];
-    resX[i]= Ys[i]-sign(Xs[i])*(sqrt(fabs(k2*Xs[i]-k3)));
+    resX[i]= Ys[i]-sign(Xs[i])*( sqrt(fabs(k2*Xs[i]-k3)));
     Xs[i]=resX[i];
     Ys[i]=resY[i];
     """]
-    
-    Hoppalongiterations =iterateOpencl(*extent,50,mapclstr,SideLength)
-    print(np.shape(Hoppalongiterations))
+    centre= np.mean(x),np.mean(y)
+    #Hoppalongiterations =iterateOpencl(0,0,0,0,10000,mapclstr,1)
     #Hoppalongiterations = points(Hoppalongiterations[:,0],Hoppalongiterations[:,1],500,500)
-    #Hoppalongorbit = iterateOpencl(0,0,0,0,10000,mapclstr,1)
-    #orbit= points(Hoppalongiterations[:,0],Hoppalongiterations[:,1],500,500)
     fig, ax = plt.subplots()
-    resultrange = prepdata2(Hoppalongiterations,SideLength)
-    #print(time-timeit.default_timer())
-    #ax.imshow(Hoppalongiterations)
+    #ax.scatter(*centre)
+    #ax.scatter(extent[0:2], extent[2:])
+    #ax.scatter(x,y)
+    #ax.scatter(0, 0)
+    
+    time=timeit.default_timer()
+    Hoppalongiterations = iterateOpencl(*extent,500,mapclstr,SideLength)
+    print(timeit.default_timer()-time)
+    #orbit= points(Hoppalongiterations[:,0],Hoppalongiterations[:,1],500,500)
+    
+    time=timeit.default_timer()
+    resultrange = prepdataMaxMin(Hoppalongiterations,SideLength,width=300,height=300)
+    print(timeit.default_timer()-time)
+    
+    #ax.imshow(orbit)
+    plt.ion()
     ax.imshow(resultrange,extent=extent)
-    plt.show()
+    #ax.scatter((9 - np.sqrt(17))/8,(7+np.sqrt(17))/8,marker="x",color="red")
+    
+    
+    def onclick(event,pointofinterest=centre):
+        
+        print(event.key)
+        clickedpoint=(event.xdata,event.ydata)
+        dist=np.linalg.norm([clickedpoint,pointofinterest])
+        print(f"clicked: {clickedpoint}")
+        print(f"dist from POI is: {dist}")
+        dist=np.linalg.norm([clickedpoint,(0,0)])
+        print(f"dist from 0 is: {dist}")
+    cid = fig.canvas.mpl_connect('button_press_event', onclick)
+    plt.show(block=True)
+    face_id=0
+    import os
+    while os.path.exists(r"C:\Users\kieran\Documents\Coding projects\Fractal-Viewer\figs\Hoppalong_maps\autosave"+str(face_id)+".svg"):
+        face_id+=1
+
+    f = r"C:\Users\kieran\Documents\Coding projects\Fractal-Viewer\figs\Hoppalong_maps\autosave"+str(face_id)+".svg"
+    print("saving to "+f)  
+    fig.savefig(f, format='svg', dpi=1200,bbox_inches='tight')
     
     #AttractorExplorer(x1,x2,y1,y2,50,mapclstr,SideLength)
 
