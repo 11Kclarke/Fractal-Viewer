@@ -160,14 +160,25 @@ def translate(fl,operations=operations2arg,replacements2arg=replacements2arg,out
     else:
         return workingfs
     
-
+#fixing the sigsplit
 def subsfunction(f,code,name,RemoveSemiColon=True):
+    print("in")
+    
     originalargs=[]
     sig,func=f
+    print(sig)
+    legalendchars=["=","-","/","*",",",")"]#characters allowed directly after variable
+    #if there were a key word whose name contained a var name it wont be replaced unless next char is in list
     
-    #sig=sig.split(',')
+    for i in legalendchars:#Adds spaces after end chars so variables can be identified 
+                func=func.replace(i," "+i+" ")
+                #code=code.replace(i," "+i+" ")
     for i in sig:#gets all variable names required for function being subbed
-        originalargs.append(i.split(" ")[1])
+        originalargs.append(i.split(" ")[-1]+" ")
+        print(i)
+        print((i.split(" ")[1]))
+    #originalargs=sig[sig.find("(")+1:-2].split(",")    
+    print(originalargs)
     codesplit = code.split("__")
     for split in codesplit:
         if split.split("(")[0] == name:#split here will be the function name and its input eg "f(x)"
@@ -175,6 +186,8 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
             #split 1 gets after first bracket, split to gets rid of after bracket, then forms list of each arg
             #inbetweenbrackets is equal to the list of argument names in function locations 
             #eg subbing somthing into __f(a,b)__ inbetween brackets would be ["a","b"]
+            print("inbetweed brackets:")
+            print(inbetweenbrackets)
             assert len(originalargs)==len(inbetweenbrackets)
             for i in zip(originalargs,inbetweenbrackets):#replaces args in function def with arg in location
                 func=func.replace(*i)
@@ -185,12 +198,30 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
             
         
         
-        
+    print("out")    
     return code
 
 if __name__ == '__main__':#for testing not really intedned to be ran
+    StabilityFractalNoCycle="""
+    int Counter = 0;
+    dtype_t Const=X[i];
+    while (dtype_abs(X[i])>DivLim && Counter<N) 
+    {
+        Counter+=1;
+        X[i]=__f(X[i],Const)__;
+    }
+   
+    """
     
-    xbig,y=sp.symbols("xbig,y")
+    x,c=sp.symbols("x,c")
+    f=c*x**2
+    fl=sp.lambdify((x,c),f)
+    print(inspect.getsource(fl))
+    flt=translate(fl)
+    print(flt)
+    mapclstr = subsfunction(flt,StabilityFractalNoCycle,"f")
+    print(mapclstr)
+    """   xbig,y=sp.symbols("xbig,y")
     f=xbig**2-xbig**3-1.0+xbig+21j
 
     fp = sp.diff(f)
@@ -203,4 +234,4 @@ if __name__ == '__main__':#for testing not really intedned to be ran
     print(flt)
     print(fp)
     print(fprimelt)
-     
+     """

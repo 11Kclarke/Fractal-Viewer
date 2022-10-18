@@ -63,8 +63,8 @@ def createstartvalssimp(x1,x2,y1,y2,SideLength):#this essentially creates a flat
     return Vals#can be reshaped into square grid    
 
 def createstartvals(x1,x2,y1,y2,SideLength):#this essentially creates a flattened grid for using as input into pyopenclfuncs
-    Xlength=int(abs((x1-x2/y1-y2)*SideLength))
-    Ylength=int(abs((y1-y2/x1-x2)*SideLength))
+    Xlength=int(abs((x1-x2)/(y1-y2)*SideLength))
+    Ylength=int(abs((y1-y2)/(x1-x2)*SideLength))
     
     Xs=np.linspace(x1,x2,Xlength,dtype=np.complex128)
     Ys=np.linspace(y1*1j,y2*1j,Ylength)
@@ -115,10 +115,10 @@ def NewtonsFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,tol=1e-12,maxdepth
     print("time to overwrite anomalous values")
     print(timeit.default_timer()-starttime)
     
-    print(np.max(Roots))
-    print(np.min(Roots))
-    Xlength=int(abs((x1-x2/y1-y2)*SideLength))
-    Ylength=int(abs((y1-y2/x1-x2)*SideLength))
+    #print(np.max(Roots))
+    #print(np.min(Roots))
+    Xlength=int(abs((x1-x2)/(y1-y2)*SideLength))
+    Ylength=int(abs((y1-y2)/(x1-x2)*SideLength))
     return Roots.reshape(Xlength,Ylength),extent
 
 def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,fprimel,npoints=1000, maxdepth=200,tol=1e-16):#this is so spagetified it confuses me as i write it 
