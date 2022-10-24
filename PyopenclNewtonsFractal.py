@@ -6,7 +6,6 @@ import os
 import matplotlib.pyplot as plt
 import sympy as sp
 import timeit
-import Main
 import PyToPyOpenCL#mine
 
 """Possible issue with input funcs where the derivative near 0 is tiny and actual func isnt ie x^n+c with large N"""
@@ -48,9 +47,6 @@ def PrepNewtonsFractalGPU(fl,fprimel,dtype="cdouble_"):
     return ElementwiseKernel(ctx,dtype+"t"+"*X,int N,double precision",mapclstr,"NewtonsMethod",preamble="#define PYOPENCL_DEFINE_CDOUBLE //#include <pyopencl-complex.h>  "),queue
 
 def createstartvalssimp(x1,x2,y1,y2,SideLength):#this essentially creates a flattened grid for using as input into pyopenclfuncs
-    Xlength=int(abs((x1-x2/y1-y2)*SideLength))
-    Ylength=int(abs((y1-y2/x1-x2)*SideLength))
-    
     Xs=np.linspace(x1,x2,SideLength,dtype=np.complex128)
     Ys=np.linspace(y1*1j,y2*1j,SideLength)
     Vals=np.zeros(SideLength*SideLength,dtype=np.complex128)
@@ -63,19 +59,25 @@ def createstartvalssimp(x1,x2,y1,y2,SideLength):#this essentially creates a flat
     return Vals#can be reshaped into square grid    
 
 def createstartvals(x1,x2,y1,y2,SideLength):#this essentially creates a flattened grid for using as input into pyopenclfuncs
-    Xlength=int(abs((x1-x2)/(y1-y2)*SideLength))
-    Ylength=int(abs((y1-y2)/(x1-x2)*SideLength))
+    
+        
+    Xlength=int(np.ceil(abs((x1-x2)/(y1-y2)*SideLength)))
+    
+    Ylength=int(np.ceil((SideLength**2)/Xlength))
     
     Xs=np.linspace(x1,x2,Xlength,dtype=np.complex128)
     Ys=np.linspace(y1*1j,y2*1j,Ylength)
-    Vals=np.zeros((Xlength,Ylength),dtype=np.complex128)
-    for i,x in enumerate(Xs):
+    Vals=np.zeros(Xlength*Ylength,dtype=np.complex128)
+    """for i,x in enumerate(Xs):
         for j,y in enumerate(Ys):
-            Vals[i,j]=x+y
-    """for i in range(SideLength):
-        Vals[i*SideLength:i*SideLength+SideLength]=Xs
-        Vals[i*SideLength:i*SideLength+SideLength]+=Ys[i]#every y val repeated side length times"""
-    return Vals#can be reshaped into square grid    
+            Vals[i,j]=x+y"""
+    
+    for i in range(Ylength):
+        
+        Vals[i*Xlength:i*Xlength+Xlength]=Xs
+        Vals[i*Xlength:i*Xlength+Xlength]+=Ys[i]#every y val repeated side length times"""
+    return Vals.reshape(Ylength,Xlength).T
+    
 
 def NewtonsFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,tol=1e-12,maxdepth=200,N=None,roundroots=True):
     
@@ -117,8 +119,8 @@ def NewtonsFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,tol=1e-12,maxdepth
     
     #print(np.max(Roots))
     #print(np.min(Roots))
-    Xlength=int(abs((x1-x2)/(y1-y2)*SideLength))
-    Ylength=int(abs((y1-y2)/(x1-x2)*SideLength))
+    Xlength=int(np.ceil(abs((x1-x2)/(y1-y2)*SideLength)))
+    Ylength=int(np.ceil((SideLength**2)/Xlength))
     return Roots.reshape(Xlength,Ylength),extent
 
 def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,fprimel,npoints=1000, maxdepth=200,tol=1e-16):#this is so spagetified it confuses me as i write it 

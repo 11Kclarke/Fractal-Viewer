@@ -332,16 +332,17 @@ def DrawNewtonsFractalOpencl(x1,x2,y1,y2,fl,fprimel,npoints=1000, maxdepth=200,t
     Roots,extent=innerwrap(x1,x2,y1,y2)
     GUI(Roots,extent,innerwrap)
     
-def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1000, maxdepth=20,cycles=32,cycleacc=1e-16,ittcountcolouring=True):
+def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1000, maxdepth=20,cycles=32,cycleacc=None,ittcountcolouring=True):
     if isinstance(fl,str):
         fl=parse_expr(fl)
         fl=sp.lambdify((x,c),f)
     if isinstance(f,sp.Basic):
         fl=sp.lambdify((x,c),f)
-   
+    
     innerwrap = PyopenclStabilityFractal.WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=npoints, maxdepth=maxdepth,cycles=cycles,
                                                              cycleacc=cycleacc,ittCountColouring=ittcountcolouring)
     Roots,extent=innerwrap(x1,x2,y1,y2)
+    #Roots=np.log(abs(Roots))
     GUI(Roots,extent,innerwrap)
         
     
@@ -410,13 +411,13 @@ if __name__ == '__main__':
     starttime = timeit.default_timer()
     x,y,t = sp.symbols('x,y,t')
     a,b,c,d = sp.symbols('a,b,c,d')
-    res = 1000
-    maxdepth = 200
+    res = 1024
+    maxdepth = 512
     f=x**2+c
     #fp=sp.diff(f)
     #fl=sp.lambdify(x,f)
     #fpl=sp.lambdify(x,fp)
-    DrawStabilityFractalOpencl(2,-2,2,-2,f,maxdepth=maxdepth,npoints=res,cycles=100,ittcountcolouring=True)
+    DrawStabilityFractalOpencl(1,-1,1,-1,f,maxdepth=maxdepth,npoints=res,cycles=32,ittcountcolouring=False)
     #DrawNewtonsfractalOpencl(-1,1,-1,1,fl,fpl,npoints=res,maxdepth=500,tol=1e-6)
     
     #drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)

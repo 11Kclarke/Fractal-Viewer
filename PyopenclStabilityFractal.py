@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import sympy as sp
 import timeit
 import PyToPyOpenCL#mine
-
+from PyopenclNewtonsFractal import createstartvals#mine
 StabilityFractalNoCycle="""
     int Counter = 0;
     dtype_t Const=X[i];//dont rename
@@ -24,20 +24,18 @@ StabilityFractalWithCycle="""
     dtype_t Const=X[i];//dont rename
     bool notfound = true;
     dtype_t pastvals [maxcycle];
-    while (dtype_abs(X[i])<DivLim && Counter<N) 
-    {
+    while (dtype_abs_squared(X[i])<DivLim && Counter<N){
         Counter+=1;
         X[i]=__f(X[i],Const)__;
         pastvals[Counter%maxcycle]=X[i];
-        for (int j = 1; j < maxcycle; ++j)
-            {
-                if (dtype_abs_squared(dtype_add(X[i],dtype_neg(pastvals[((Counter%maxcycle)+j)%maxcycle])))<cycleacc)
-                { 
-                X[i].real=-j;
-                notfound=false;
-                
-                
-                
+        //Counter%maxcycle start for cycle finding
+        for (int j = 1; j < maxcycle; ++j)//goes backwards through stored vals 
+        {
+                if (dtype_abs_squared(dtype_add(X[i],dtype_neg(pastvals[(Counter-j)%maxcycle])))<cycleacc)
+                {
+                X[i].real=-j-1;//negative so it can be seen easily where cycles have been found
+                Counter=N+1;
+                PYOPENCL_ELWISE_CONTINUE;//pretty sure this does nothing
                 }
             }
     }
@@ -54,11 +52,16 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
     cl.tools.get_or_register_dtype(dtype+"t", np.complex128)
     
     CodeForIttCountColouring="""
-    if(notfound)
+    if(Counter<N)
     {
-        X[i].real=Counter;
+        X[i].real=Counter;  
     }
-    
+    else if(Counter==N)
+    {
+        X[i].real=0;
+    }
+        
+       
         """
     if cycles==False or cycles==0:#not sure about behaviour of not cycles when cycles not a bool
         Code=StabilityFractalNoCycle    
@@ -86,23 +89,51 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
         return ElementwiseKernel(ctx,dtype+"t"+" *X,int N,double DivLim,double cycleacc",mapclstr,"StabilityFractal",preamble=preamble),queue
     
 
-def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,Divlim=2.0,maxdepth=30,cycles=False,cycleacc=1e-6):
-    
-    #starttime = timeit.default_timer()
+def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,Divlim=2.0,maxdepth=30,cycles=False,cycleacc=None,shuffle=False):
     extent = [x1,x2,y1,y2]
-    from PyopenclNewtonsFractal import createstartvals
+    origTime=timeit.default_timer()
     Stabilities=createstartvals(x1,x2,y1,y2,SideLength)
-    print(np.shape(Stabilities))
+    print(f"Time To create startvals: {timeit.default_timer()-origTime}")
+    Stabilities=Stabilities.flatten()
+    if shuffle:
+        Time=timeit.default_timer()
+        orderTemplate = np.arange(SideLength**2)
+        shuf_order = orderTemplate
+        np.random.shuffle(shuf_order)
+        Stabilities=Stabilities[shuf_order]
+        shuffletime = timeit.default_timer()-Time
+        print(shuffletime)
     Stabilities=cl.array.to_device(queue,Stabilities)
+    
+    Xlength=int(np.ceil(abs((x1-x2)/(y1-y2)*SideLength)))
+    Ylength=int(np.ceil((SideLength**2)/Xlength))
+    
     if cycles==False or cycles == 0:#not sure about behaviour of not cycles when cycles not a bool
+        
         mapcl(Stabilities,maxdepth,np.float64(Divlim))
     else:
-        
+        if cycleacc == None:
+            cycleacc=(((x1-x2)**2+(y1-y2)**2)/(Xlength**2+Ylength**2))
+            #default threshold is 50% of diagonal length of 1 pixel 
+            #print(f"cycle tolerance auto calced as {cycleacc}")
+        Time=timeit.default_timer()
         mapcl(Stabilities,maxdepth,np.float64(Divlim),np.float64(cycleacc))
+        
     Stabilities=np.real(Stabilities.get())
-    Xlength=int(abs((x1-x2)/(y1-y2)*SideLength))
-    Ylength=int(abs((y1-y2)/(x1-x2)*SideLength))
-    print(np.min(Stabilities))
+    print(f"Time OpenCl: {timeit.default_timer()-Time}")
+    if shuffle:
+        Time=timeit.default_timer()
+        unshuf_order = np.zeros_like(orderTemplate)
+        unshuf_order[shuf_order] = np.arange(SideLength**2)  
+        Stabilities=Stabilities[unshuf_order]
+        unshuffletime = timeit.default_timer()-Time
+        print(unshuffletime)
+        print("total shuffle unshuffle time:")
+        print(shuffletime+unshuffletime)
+    #print(np.min(Stabilities))
+    #print(np.max(Stabilities))
+    #print(maxdepth)
+    print(f"whole generatorfucntion time {timeit.default_timer()-origTime}")
     return Stabilities.reshape(Xlength,Ylength),extent
 
 def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype="cdouble_"
@@ -111,6 +142,7 @@ def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype
     def innerwrap(x1,x2,y1,y2):
         return StabilityFractalPyOpenCL(x1,x2,y1,y2,npoints,openclfunc,queue,Divlim=Divlim,maxdepth=maxdepth,cycles=cycles,cycleacc=cycleacc)
     return innerwrap
+
 if __name__ == '__main__':#not really intended to be script just here for testing and demo
     x,Const=sp.symbols("x,Const")
     f=x**2+Const
