@@ -94,54 +94,35 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
 def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,DivLim=2.0,maxdepth=30,cycles=32,cycleacc=None,shuffle=False):
     DivLim=DivLim**2
     extent = [x1,x2,y1,y2]
-    origTime=timeit.default_timer()
     Stabilities=createstartvals(x1,x2,y1,y2,SideLength)
-    print(f"Time To create startvals: {timeit.default_timer()-origTime}")
     Stabilities=Stabilities.flatten()
     
     if shuffle:
-        Time=timeit.default_timer()
         orderTemplate = np.arange(SideLength**2)
         shuf_order = orderTemplate
         np.random.shuffle(shuf_order)
         Stabilities=Stabilities[shuf_order]
-        shuffletime = timeit.default_timer()-Time
         
-        #print(shuffletime)
     Stabilities=cl.array.to_device(queue,Stabilities)
-
     Xlength=int(np.ceil(abs((x1-x2)/(y1-y2)*SideLength)))
     Ylength=int(np.ceil((SideLength**2)/Xlength))
     
     if cycles==False or int(cycles) == 0:#not sure about behaviour of not cycles when cycles not a bool
-        Time=timeit.default_timer()
-        
         mapcl(Stabilities,maxdepth,np.float64(DivLim))
     else:
         if cycleacc == None:
             cycleacc=np.sqrt((((x1-x2)**2+(y1-y2)**2)/(Xlength**2+Ylength**2)))
             #default threshold is 50% of diagonal length of 1 pixel 
             #print(f"cycle tolerance auto calced as {cycleacc}")
-        Time=timeit.default_timer()
         mapcl(Stabilities,maxdepth,np.float64(DivLim),np.float64(cycleacc))
         
     Stabilities=np.real(Stabilities.get())
-
-    print(f"Time OpenCl: {timeit.default_timer()-Time}")
     if shuffle:
-        Time=timeit.default_timer()
         unshuf_order = np.zeros_like(orderTemplate)
         unshuf_order[shuf_order] = np.arange(SideLength**2)  
         Stabilities=Stabilities[unshuf_order]
-        unshuffletime = timeit.default_timer()-Time
-        print(unshuffletime)
-        print("total shuffle unshuffle time:")
-        print(shuffletime+unshuffletime)
-    print(np.min(Stabilities))
-    print(np.max(Stabilities))
-    #print(maxdepth)
-
-    print(f"whole generatorfucntion time {timeit.default_timer()-origTime}")
+    #print(np.min(Stabilities))
+    #print(np.max(Stabilities))
     return Stabilities.reshape(Xlength,Ylength),extent
 
 def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype="cdouble_"
