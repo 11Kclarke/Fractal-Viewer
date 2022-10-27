@@ -1,7 +1,7 @@
 import sys
 print(sys.version)
 from tokenize import Exponent
-from matplotlib.transforms import Transform
+import matplotlib as mpl
 import numpy as np
 import matplotlib.pyplot as plt
 import sympy as sp
@@ -208,6 +208,9 @@ def covfunc1thread(f,npoints,maxdepth,iterator,fractgenerator,iscomplex=True):
 
 def plotfract(cmap,stabilities=None,extent=None,plottype=None,ax=None,shape=None):    
         if plottype=="imshow":
+            
+            #divnorm = mpl.colors.TwoSlopeNorm(vmin=np.min(stabilities), vcenter=0, vmax=-np.min(stabilities)*5)
+            #ax.imshow(stabilities,extent=extent,origin='lower',cmap=cmap,vmax=abs(np.min(stabilities))*32)
             ax.imshow(stabilities,extent=extent,origin='lower',cmap=cmap)
         elif plottype=="contour":
             xcoords= np.linspace(extent[0],extent[1],shape[0])
@@ -332,7 +335,7 @@ def DrawNewtonsFractalOpencl(x1,x2,y1,y2,fl,fprimel,npoints=1000, maxdepth=200,t
     Roots,extent=innerwrap(x1,x2,y1,y2)
     GUI(Roots,extent,innerwrap)
     
-def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1000, maxdepth=20,cycles=32,cycleacc=None,ittcountcolouring=True):
+def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1024, maxdepth=3000,cycles=16,cycleacc=None,ittcountcolouring=True):
     if isinstance(fl,str):
         fl=parse_expr(fl)
         fl=sp.lambdify((x,c),f)
@@ -412,12 +415,12 @@ if __name__ == '__main__':
     x,y,t = sp.symbols('x,y,t')
     a,b,c,d = sp.symbols('a,b,c,d')
     res = 1024
-    maxdepth = 512
+    maxdepth = 1024
     f=x**2+c
     #fp=sp.diff(f)
     #fl=sp.lambdify(x,f)
     #fpl=sp.lambdify(x,fp)
-    DrawStabilityFractalOpencl(1,-1,1,-1,f,maxdepth=maxdepth,npoints=res,cycles=32,ittcountcolouring=False)
+    DrawStabilityFractalOpencl(1,-1,1,-1,f,maxdepth=maxdepth,npoints=res,cycles=16,ittcountcolouring=True)
     #DrawNewtonsfractalOpencl(-1,1,-1,1,fl,fpl,npoints=res,maxdepth=500,tol=1e-6)
     
     #drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)
