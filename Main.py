@@ -21,7 +21,8 @@ import PyopenclStabilityFractal
 np.warnings.filterwarnings("ignore")
 
 plt.ion()
-
+x,y,t = sp.symbols('x,y,t')
+a,b,c,d,C = sp.symbols('a,b,c,d,C')
 
 """To do:
 fix zoom with newtontype fractals atm some kind of rendering issue or sommin
@@ -48,6 +49,9 @@ def plotfract(cmap,stabilities=None,extent=None,plottype=None,ax=None,shape=None
             if minval>0:minval=-0.01
             maxval=np.max(stabilities)
             if maxval<0:maxval=0.01
+            maxval*=1/30
+            #minval=-np.log(-minval)
+            minval=minval/400
             divnorm = mpl.colors.TwoSlopeNorm(vmin=minval, vcenter=0, vmax=maxval)
             ax.imshow(stabilities,extent=extent,origin='lower',cmap=cmap,norm=divnorm)
             #ax.imshow(stabilities,extent=extent,origin='lower',cmap=cmap)
@@ -70,7 +74,7 @@ def plotfract(cmap,stabilities=None,extent=None,plottype=None,ax=None,shape=None
         return cmap
 
 #should prolly be a class
-def GUI(stabilities,extent,generator,plottype="imshow",cmap="prism_r",Grid=False,plotfunc=plotfract):
+def GUI(stabilities,extent,generator,plottype="imshow",cmap="terrain",Grid=False,plotfunc=plotfract):
     
     fig, ax = plt.subplots()
     ax.set_aspect("auto")
@@ -170,9 +174,9 @@ def DrawNewtonsFractalOpencl(x1,x2,y1,y2,fl,fprimel,npoints=1000, maxdepth=200,t
 def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1024, maxdepth=3000,cycles=16,cycleacc=None,ittcountcolouring=True):
     if isinstance(fl,str):
         fl=parse_expr(fl)
-        fl=sp.lambdify((x,c),f)
-    if isinstance(f,sp.Basic):
-        fl=sp.lambdify((x,c),f)
+        fl=sp.lambdify((x,c),fl)
+    if isinstance(fl,sp.Basic):
+        fl=sp.lambdify((x,c),fl)
     
     innerwrap = PyopenclStabilityFractal.WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=npoints, maxdepth=maxdepth,cycles=cycles,
                                                              cycleacc=cycleacc,ittCountColouring=ittcountcolouring)
@@ -198,10 +202,9 @@ of gen and seed, as well as the original image.
 if __name__ == '__main__':
    
     starttime = timeit.default_timer()
-    x,y,t = sp.symbols('x,y,t')
-    a,b,c,d = sp.symbols('a,b,c,d')
+
     res = 1024
-    maxdepth = 1024
+    maxdepth = 2048*2
     f=x**2+c
     
     DrawStabilityFractalOpencl(1,-1,1,-1,f,maxdepth=maxdepth,npoints=res,cycles=16,ittcountcolouring=True)
