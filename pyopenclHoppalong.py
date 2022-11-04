@@ -12,13 +12,36 @@ import timeit
 
 os.environ["PYOPENCL_CTX"]="0"
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
-
-
-
+hoppalongx = "k1- Xs[i]"
+hoppalongy = "Ys[i]-sign(Xs[i])*( sqrt(fabs(k2*Xs[i]-k3)))"
+def prepAttractorCl(f,g,dtype=float):
+    from PyToPyOpenCL import subsfunction
+    mapclstr=["int ittlim,float k1,float k2, float k3,float **Y,float **X","""
+        for (int k=0; k<ittlim; k++){
+            resY[i+N*k+1] =__f(X[i+N*k],Y[i+N*k],k1,k2,k3,k4,k5)__;
+            resX[i+N*k+1]= __g(X[i+N*k],Y[i+N*k],k1,k2,k3,k4,k5)__;
+        }
+        """]
+    f=("float k1,float k2, float k3,float k4,float k5,float **Y,float **X".split(","),f)
+    g=("float k1,float k2, float k3,float k4,float k5,float **Y,float **X".split(","),g)
+    mapclstr[0]=subsfunction(f,mapclstr[0],"f",RemoveSemiColon=False)
+    mapclstr[0]=subsfunction(g,mapclstr[0],"g",RemoveSemiColon=False)
+    print(mapclstr)
+    if dtype == np.float64:
+            mapclstr[0] = mapclstr[0].replace("float","double")
+            mapclstr[1] = mapclstr[1].replace("float","double")
+            ctx = cl.create_some_context()
+            queue = cl.CommandQueue(cl.create_some_context())
+            mapcl = ElementwiseKernel(ctx,*mapclstr,"mapcl")
+    else:
+            ctx = cl.create_some_context()
+            queue = cl.CommandQueue(cl.create_some_context())
+            mapcl = ElementwiseKernel(ctx,*mapclstr,"mapcl")
+    return mapcl
+            
 def iteratefast(Consts, Xs, Ys, resY, resX,mapcl,N,SideLength,precompiled):
     #print("optimised for time")
     Hoppalongiterations=[]
-
     for i in range(N):
         mapcl(*Consts, Xs, Ys, resY, resX)
         Hoppalongiterations.append([resX.get(),resY.get()])
@@ -26,35 +49,33 @@ def iteratefast(Consts, Xs, Ys, resY, resX,mapcl,N,SideLength,precompiled):
 
 def iterateSavememory(Consts, Xs, Ys, resY, resX,mapcl,N,SideLength,precompiled):
     Hoppalongiterations = np.zeros((N,2,SideLength**2))
-    
     for i in range(N):
         mapcl(*Consts, Xs, Ys, resY, resX)
         Hoppalongiterations[i] =  [resX.get(),resY.get()]
     return Hoppalongiterations
-def iterateOpencl(x1,x2,y1,y2,N,mapclstr,SideLength,args = np.array([2.0,1.0,0.0],dtype =np.float32),iterator=iteratefast,dtype=np.float32):
+
+def iterateOpencl(x1,x2,y1,y2,N,mapclstr,SideLength,Consts = np.array([2.0,1.0,0.0],dtype =np.float32),iterator=iteratefast,dtype=np.float32,precompiled=False):
     precompiled=False
-    if str(type(mapclstr[0]))=="<class 'pyopencl.elementwise.ElementwiseKernel'>":
-        mapcl=mapclstr[0]
-        ctx = mapclstr[1]
-        queue = mapclstr[2]
-        precompiled=True
-        print("\n\n Map has been precompiled \n\n")
-    elif dtype == np.float64:
-        mapclstr[0] = mapclstr[0].replace("float","double")
-        mapclstr[1] = mapclstr[1].replace("float","double")
-        ctx = cl.create_some_context()
-        queue = cl.CommandQueue(ctx)
-        mapcl = ElementwiseKernel(ctx,*mapclstr,"mapcl")
-    else:
-        
-        ctx = cl.create_some_context()
-        queue = cl.CommandQueue(ctx)
-        mapcl = ElementwiseKernel(ctx,*mapclstr,"mapcl")
+    if not precompiled:
+        if str(type(mapclstr[0]))=="<class 'pyopencl.elementwise.ElementwiseKernel'>":
+            mapcl=mapclstr[0]
+            ctx = mapclstr[1]
+            queue = mapclstr[2]
+            precompiled=True
+            print("\n\n Map has been precompiled \n\n")
+        elif dtype == np.float64:
+            mapclstr[0] = mapclstr[0].replace("float","double")
+            mapclstr[1] = mapclstr[1].replace("float","double")
+            ctx = cl.create_some_context()
+            queue = cl.CommandQueue(ctx)
+            mapcl = ElementwiseKernel(ctx,*mapclstr,"mapcl")
+        else:
+            
+            ctx = cl.create_some_context()
+            queue = cl.CommandQueue(ctx)
+            mapcl = ElementwiseKernel(ctx,*mapclstr,"mapcl")
     
     if SideLength>1:
-        
-        print(SideLength)
-        print("here")
         xvals = np.linspace(x1,x2,SideLength,dtype =dtype)
         yvals = np.linspace(y1,y2,SideLength,dtype =dtype) 
         resx_np = np.zeros(SideLength**2,dtype =dtype)
@@ -70,9 +91,6 @@ def iterateOpencl(x1,x2,y1,y2,N,mapclstr,SideLength,args = np.array([2.0,1.0,0.0
         Ys = cl.array.to_device(queue, yvalsOrdered)  
         Hoppalongiterations = iterator(Consts, Xs, Ys, resY, resX,mapcl,N,SideLength,precompiled)
     else:
-        #for i in range(5):
-            #mapclstr[1]+=mapclstr[1]
-        #print("n less than 2")
         xvals = np.array(x1,dtype=dtype)
         yvals = np.array(y1,dtype=dtype)
         resx_np = np.array(0,dtype =dtype)
@@ -141,24 +159,18 @@ def AttractorExplorer(x1,x2,y1,y2,N,mapclstr,SideLength,Res2 = 300,N2=40000,args
     if str(type(mapclstr[0]))=="<class 'pyopencl.elementwise.ElementwiseKernel'>":
         mapcl=mapclstr[0]
         ctx = mapclstr[1]
-        queue = mapclstr[2]
-        precompiled=True
-        print("\n\n Map has been precompiled \n\n")
     elif dtype == np.float64:
         mapclstr[0] = mapclstr[0].replace("float","double")
         mapclstr[1] = mapclstr[1].replace("float","double")
         ctx = cl.create_some_context()
-        queue = cl.CommandQueue(ctx)
         mapcl = [ElementwiseKernel(ctx,*mapclstr,"mapcl"),cl.create_some_context(),cl.CommandQueue(ctx)]
     else:    
         ctx = cl.create_some_context()
-        queue = cl.CommandQueue(ctx)
-        
         mapcl = [ElementwiseKernel(ctx,*mapclstr,"mapcl"),cl.create_some_context(),cl.CommandQueue(ctx)]
     
     plt.ion()
     extent = [x1,x2,y1,y2]
-    Hoppalongiterations =iterateOpencl(*extent,N,mapcl,SideLength)
+    Hoppalongiterations =iterateOpencl(*extent,N,mapcl,SideLength,args=args,precompiled=True)
     resultrange = prepdataMaxMin(Hoppalongiterations,SideLength)
     
     #Hoppalongiterations = points(Hoppalongiterations[:,0,0],Hoppalongiterations[:,1,0],1000,1000)
@@ -210,13 +222,17 @@ def AttractorExplorer(x1,x2,y1,y2,N,mapclstr,SideLength,Res2 = 300,N2=40000,args
         #print((event.xdata,event.ydata))
     cid = fig.canvas.mpl_connect('button_press_event', onclick)
     plt.show(block=True) 
+    
+    
+    
 if __name__ == '__main__':
-    time = timeit.default_timer()
+    #time = timeit.default_timer()
     SideLength = 1000
     Consts = np.array([2,1,0],dtype =np.float32)
     #extent=np.array([(9 - np.sqrt(17))/8,10,(7+np.sqrt(17))/8,10])
     #centreofringsapprox=(1.4490920335076216, -0.4735961188883253)
-    centresoffirstlargerings= [(-0.2705627705627691, 5.974025974025977),
+    print(prepAttractorCl(hoppalongx,hoppalongy))
+    """centresoffirstlargerings= [(-0.2705627705627691, 5.974025974025977),
                                (4.761904761904766, 2.8354978354978364),
                                (7.846320346320351, -2.0887445887445875),
                                (4.707792207792213, -6.255411255411255),
@@ -227,12 +243,7 @@ if __name__ == '__main__':
     x,y=zip(*centresoffirstlargerings)
     extent=np.array([-10,10,-10,10])*5
     [x1,x2,y1,y2]=extent
-    mapclstr=["float k1,float k2, float k3, float *Xs,float *Ys,float *resY,float *resX","""
-    resY[i] =k1- Xs[i];
-    resX[i]= Ys[i]-sign(Xs[i])*( sqrt(fabs(k2*Xs[i]-k3)));
-    Xs[i]=resX[i];
-    Ys[i]=resY[i];
-    """]
+    
     centre= np.mean(x),np.mean(y)
     #Hoppalongiterations =iterateOpencl(0,0,0,0,10000,mapclstr,1)
     #Hoppalongiterations = points(Hoppalongiterations[:,0],Hoppalongiterations[:,1],500,500)
@@ -269,15 +280,16 @@ if __name__ == '__main__':
     cid = fig.canvas.mpl_connect('button_press_event', onclick)
     plt.show(block=True)
     face_id=0
-    import os
-    while os.path.exists(r"C:\Users\kieran\Documents\Coding projects\Fractal-Viewer\figs\Hoppalong_maps\autosave"+str(face_id)+".svg"):
-        face_id+=1
+    import os"""
+    #while os.path.exists(r"C:\Users\kieran\Documents\Coding projects\Fractal-Viewer\figs\Hoppalong_maps\autosave"+str(face_id)+".svg"):
+        #face_id+=1
 
-    f = r"C:\Users\kieran\Documents\Coding projects\Fractal-Viewer\figs\Hoppalong_maps\autosave"+str(face_id)+".svg"
-    print("saving to "+f)  
-    fig.savefig(f, format='svg', dpi=1200,bbox_inches='tight')
+    #f = r"C:\Users\kieran\Documents\Coding projects\Fractal-Viewer\figs\Hoppalong_maps\autosave"+str(face_id)+".svg"
+    #print("saving to "+f)  
+    #fig.savefig(f, format='svg', dpi=1200,bbox_inches='tight')
     
-    #AttractorExplorer(x1,x2,y1,y2,50,mapclstr,SideLength)
+
+    
 
 
 

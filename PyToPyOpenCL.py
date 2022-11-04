@@ -165,6 +165,7 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
     print("in")
     
     originalargs=[]
+    print(f)
     sig,func=f
     print(sig)
     legalendchars=["=","-","/","*",",",")"]#characters allowed directly after variable
@@ -176,9 +177,9 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
     for i in sig:#gets all variable names required for function being subbed
         originalargs.append(i.split(" ")[-1]+" ")
         print(i)
-        print((i.split(" ")[1]))
+        #print((i.split(" ")[1]))
     #originalargs=sig[sig.find("(")+1:-2].split(",")    
-    print(originalargs)
+    print(func)
     codesplit = code.split("__")
     for split in codesplit:
         if split.split("(")[0] == name:#split here will be the function name and its input eg "f(x)"
@@ -191,7 +192,7 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
             assert len(originalargs)==len(inbetweenbrackets)
             for i in zip(originalargs,inbetweenbrackets):#replaces args in function def with arg in location
                 func=func.replace(*i)
-            
+            print(func)
             if RemoveSemiColon:
                 func=func.replace(";","")    
             code=code.replace(f"__{split}__",func)
@@ -209,6 +210,7 @@ if __name__ == '__main__':#for testing not really intedned to be ran
     {
         Counter+=1;
         X[i]=__f(X[i],Const)__;
+        Y[i]=__g(X[i],Const)__;
     }
    
     """
@@ -220,6 +222,7 @@ if __name__ == '__main__':#for testing not really intedned to be ran
     flt=translate(fl)
     print(flt)
     mapclstr = subsfunction(flt,StabilityFractalNoCycle,"f")
+    
     print(mapclstr)
     """   xbig,y=sp.symbols("xbig,y")
     f=xbig**2-xbig**3-1.0+xbig+21j

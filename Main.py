@@ -46,14 +46,17 @@ add line fractals such as sepinski triangle"""
 def plotfract(cmap,stabilities=None,extent=None,plottype=None,ax=None,shape=None):    
         if plottype=="imshow":
             minval=np.min(stabilities)
-            if minval>0:minval=-0.01
             maxval=np.max(stabilities)
-            if maxval<0:maxval=0.01
-            maxval*=1/30
-            #minval=-np.log(-minval)
-            minval=minval/400
-            divnorm = mpl.colors.TwoSlopeNorm(vmin=minval, vcenter=0, vmax=maxval)
-            ax.imshow(stabilities,extent=extent,origin='lower',cmap=cmap,norm=divnorm)
+            if maxval-minval>1000:
+                if minval>0:minval=-0.01
+                if maxval<0:maxval=0.01
+                maxval*=1/30
+                #minval=-np.log(-minval)
+                minval=minval/400
+                divnorm = mpl.colors.TwoSlopeNorm(vmin=minval, vcenter=0, vmax=maxval)
+                ax.imshow(stabilities,extent=extent,origin='lower',cmap=cmap,norm=divnorm)
+            else:
+                ax.imshow(stabilities,extent=extent,origin='lower',cmap=cmap)
             #ax.imshow(stabilities,extent=extent,origin='lower',cmap=cmap)
         elif plottype=="contour":
             xcoords= np.linspace(extent[0],extent[1],shape[0])
@@ -157,15 +160,15 @@ def GUI(stabilities,extent,generator,plottype="imshow",cmap="terrain",Grid=False
     text_box.set_val(cmap)  # Trigger `submit` with the initial string.
     plt.show(block=True)    
 
-def DrawNewtonsFractalOpencl(x1,x2,y1,y2,fl,fprimel,npoints=1000, maxdepth=200,tol=1e-16):
+def DrawNewtonsFractalOpencl(x1,x2,y1,y2,fl,fprimel=None,npoints=1000, maxdepth=200,tol=1e-16):
     if isinstance(fl,str):
         fl=parse_expr(fl)
-        fp=sp.diff(f)
-        fl=sp.lambdify(x,f)
+        fp=sp.diff(fl)
+        fl=sp.lambdify(x,fl)
         fprimel=sp.lambdify(x,fp)
     if fprimel==None:
-        fp=sp.diff(f)
-        fl=sp.lambdify(x,f)
+        fp=sp.diff(fl)
+        fl=sp.lambdify(x,fl)
         fprimel=sp.lambdify(x,fp)
     innerwrap = PyopenclNewtonsFractal.WrapperOpenCltoDraw(x1,x2,y1,y2,fl,fprimel,npoints=npoints, maxdepth=maxdepth,tol=tol)
     Roots,extent=innerwrap(x1,x2,y1,y2)
