@@ -24,19 +24,19 @@ def prepAttractorCl(f,g,dtype=float):
         """]
     f=("float k1,float k2, float k3,float k4,float k5,float **Y,float **X".split(","),f)
     g=("float k1,float k2, float k3,float k4,float k5,float **Y,float **X".split(","),g)
-    mapclstr[0]=subsfunction(f,mapclstr[0],"f",RemoveSemiColon=False)
-    mapclstr[0]=subsfunction(g,mapclstr[0],"g",RemoveSemiColon=False)
+    mapclstr[1]=subsfunction(f,mapclstr[1],"f",RemoveSemiColon=False)
+    mapclstr[1]=subsfunction(g,mapclstr[1],"g",RemoveSemiColon=False)
+    print("\n\n")
     print(mapclstr)
+    print("\n\n")
     if dtype == np.float64:
-            mapclstr[0] = mapclstr[0].replace("float","double")
             mapclstr[1] = mapclstr[1].replace("float","double")
-            ctx = cl.create_some_context()
-            queue = cl.CommandQueue(cl.create_some_context())
-            mapcl = ElementwiseKernel(ctx,*mapclstr,"mapcl")
-    else:
-            ctx = cl.create_some_context()
-            queue = cl.CommandQueue(cl.create_some_context())
-            mapcl = ElementwiseKernel(ctx,*mapclstr,"mapcl")
+            mapclstr[1] = mapclstr[1].replace("float","double")
+            
+    
+    ctx = cl.create_some_context()
+    queue = cl.CommandQueue(cl.create_some_context())
+    mapcl = ElementwiseKernel(ctx,*mapclstr,"mapcl")
     return mapcl
             
 def iteratefast(Consts, Xs, Ys, resY, resX,mapcl,N,SideLength,precompiled):
@@ -231,7 +231,7 @@ if __name__ == '__main__':
     Consts = np.array([2,1,0],dtype =np.float32)
     #extent=np.array([(9 - np.sqrt(17))/8,10,(7+np.sqrt(17))/8,10])
     #centreofringsapprox=(1.4490920335076216, -0.4735961188883253)
-    print(prepAttractorCl(hoppalongx,hoppalongy))
+    #print(prepAttractorCl(hoppalongx,hoppalongy))
     """centresoffirstlargerings= [(-0.2705627705627691, 5.974025974025977),
                                (4.761904761904766, 2.8354978354978364),
                                (7.846320346320351, -2.0887445887445875),

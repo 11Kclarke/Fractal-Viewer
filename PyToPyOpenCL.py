@@ -163,7 +163,7 @@ def translate(fl,operations=operations2arg,replacements2arg=replacements2arg,out
 #fixing the sigsplit
 def subsfunction(f,code,name,RemoveSemiColon=True):
     print("in")
-    
+    print(code)
     originalargs=[]
     print(f)
     sig,func=f
@@ -181,6 +181,9 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
     #originalargs=sig[sig.find("(")+1:-2].split(",")    
     print(func)
     codesplit = code.split("__")
+    print("\n\n")
+    print(codesplit)
+    print("\n\n")
     for split in codesplit:
         if split.split("(")[0] == name:#split here will be the function name and its input eg "f(x)"
             inbetweenbrackets=split.split("(")[1].split(")")[0].split(",")
@@ -190,11 +193,16 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
             print("inbetweed brackets:")
             print(inbetweenbrackets)
             assert len(originalargs)==len(inbetweenbrackets)
+            print("__replacing__")
             for i in zip(originalargs,inbetweenbrackets):#replaces args in function def with arg in location
+                print(i)
                 func=func.replace(*i)
-            print(func)
+                print(func)
             if RemoveSemiColon:
-                func=func.replace(";","")    
+                func=func.replace(";","")
+            print(func)
+            print("to")
+            print(split)    
             code=code.replace(f"__{split}__",func)
             
         

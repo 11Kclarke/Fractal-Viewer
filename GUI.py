@@ -7,7 +7,7 @@ frame = tk.Tk()
 frame.title("TextBox Input")
 frame.geometry('600x400')
 # Function for getting Input
-# from textbox and printing it 
+# from textbox and printing it SGDSD
 # at label widget
 class mainwindow:
     def StabilityFrac(self):
@@ -39,7 +39,7 @@ class mainwindow:
                                    cycleacc=cycleacc)
         
     def NewtonsFrac(self):
-        options=self.AllOptions["Newtons"]
+        options=self.AllOptions["Newtons"].copy()
         for i in options.keys():
             options[i]=options[i].get()
         extent=options['Extent/Corners in form x1,x2,y1,y2'].split(",")
@@ -86,15 +86,15 @@ class mainwindow:
         self.AllOptions={"Stability":{},"Newtons":{},"Attractor":{}}
         
         # Button Creation
-        StabilityFracButton = tk.Button(self.StabilityFracframe,
+        StabilityFracButton = ttk.Button(self.StabilityFracframe,
                                 text = "Stability Fractal", 
                                 command = self.StabilityFrac)
 
-        NewtonsFracButton = tk.Button(self.NewtonsFracframe,
+        NewtonsFracButton = ttk.Button(self.NewtonsFracframe,
                                 text = "Newtons Fractal", 
                                 command = self.NewtonsFrac)
 
-        AttractorFracButton = tk.Button(self.AttractorFracframe,
+        AttractorFracButton = ttk.Button(self.AttractorFracframe,
                                 text = "Attractor Fractal", 
                                 command = self.AttractorFrac)
         StabilityFracButton.grid(row=0,column=0,padx=2)
