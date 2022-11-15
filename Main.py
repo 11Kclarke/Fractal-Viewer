@@ -11,9 +11,9 @@ import sys
 import timeit
 import math
 from matplotlib.widgets import TextBox
-import numba
+
 from numba import *
-import inspect
+
 
 
 import PyopenclNewtonsFractal

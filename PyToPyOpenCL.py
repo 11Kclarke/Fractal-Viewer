@@ -160,54 +160,60 @@ def translate(fl,operations=operations2arg,replacements2arg=replacements2arg,out
     else:
         return workingfs
     
-#fixing the sigsplit
+"""TO DO:
+Fix bug with brackets inside of array index, causing inbetweenbrackets to be wrong
+make matching of variables in function def to call sig more intuitive"""
 def subsfunction(f,code,name,RemoveSemiColon=True):
-    print("in")
-    print(code)
+    print("\n\n\n\n\n\nin subsfunc ")
+    
+    
     originalargs=[]
-    print(f)
+
     sig,func=f
-    print(sig)
+    #print(f)
     legalendchars=["=","-","/","*",",",")"]#characters allowed directly after variable
     #if there were a key word whose name contained a var name it wont be replaced unless next char is in list
     
     for i in legalendchars:#Adds spaces after end chars so variables can be identified 
                 func=func.replace(i," "+i+" ")
                 #code=code.replace(i," "+i+" ")
+    
     for i in sig:#gets all variable names required for function being subbed
         originalargs.append(i.split(" ")[-1]+" ")
-        print(i)
+        
         #print((i.split(" ")[1]))
-    #originalargs=sig[sig.find("(")+1:-2].split(",")    
-    print(func)
+    #originalargs=sig[sig.find("(")+1:-2].split(",")  
+    #print(originalargs)
+    #print()  
+    #print("code split")
     codesplit = code.split("__")
-    print("\n\n")
-    print(codesplit)
-    print("\n\n")
+    #print(codesplit)
+    
     for split in codesplit:
         if split.split("(")[0] == name:#split here will be the function name and its input eg "f(x)"
-            inbetweenbrackets=split.split("(")[1].split(")")[0].split(",")
+            print(split)
+            strinbetweenbrackets=split.split("(")[1].split(")")[0]
+            inbetweenbrackets=strinbetweenbrackets.split(",")
+            print(inbetweenbrackets)
             #split 1 gets after first bracket, split to gets rid of after bracket, then forms list of each arg
             #inbetweenbrackets is equal to the list of argument names in function locations 
             #eg subbing somthing into __f(a,b)__ inbetween brackets would be ["a","b"]
-            print("inbetweed brackets:")
-            print(inbetweenbrackets)
+            # strinbetweenbrackets = "a,b"
+           
             assert len(originalargs)==len(inbetweenbrackets)
-            print("__replacing__")
+            
             for i in zip(originalargs,inbetweenbrackets):#replaces args in function def with arg in location
-                print(i)
-                func=func.replace(*i)
-                print(func)
+                #print("replacing ")
+                #print(i[0].strip(),i[1].strip())
+                func=func.replace(i[0].strip()+" ",i[1].strip())#the +" " is critical
+                #it prevents variable names coincidentally appearing as substrings in other things being replaced
+                #for example when c is a variable being replaced with Const c_double goes to Const_double
             if RemoveSemiColon:
                 func=func.replace(";","")
-            print(func)
-            print("to")
-            print(split)    
+             
             code=code.replace(f"__{split}__",func)
-            
-        
-        
-    print("out")    
+    print(code)
+    print("leaving subsfunc \n\n\n\n\n\n")      
     return code
 
 if __name__ == '__main__':#for testing not really intedned to be ran

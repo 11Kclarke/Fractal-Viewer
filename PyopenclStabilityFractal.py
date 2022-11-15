@@ -72,7 +72,7 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
     if isinstance(cycles,str):
         Code=cycles
     
-    
+    print(flt)
     mapclstr = PyToPyOpenCL.subsfunction(flt,Code,"f")
     print(mapclstr)                                                                                                          
     mapclstr=mapclstr.replace("dtype_",dtype)
@@ -133,9 +133,9 @@ def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype
     return innerwrap
 
 if __name__ == '__main__':#not really intended to be script just here for testing and demo
-    x,Const=sp.symbols("x,Const")
-    f=x**2+Const
-    fl=sp.lambdify((x,Const),f)
+    x,c=sp.symbols("x,c")
+    f=x**2+c
+    fl=sp.lambdify((x,c),f)
 
 
    
