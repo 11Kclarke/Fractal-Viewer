@@ -18,9 +18,12 @@ import re
 
 
 #must obey order of operations
-operations1arg=["-"]
+
 operations2arg = ["^","/","*","+"]
+operations2arg=operations2arg[::-1]
 replacements2arg = ["dtype_pow(base,arg)","dtype_divide(base,arg)","dtype_mul(base,arg)","dtype_add(base,arg)"]
+replacements2arg=replacements2arg[::-1]
+operations1arg=["-"]
 replacements1arg = ["dtype_neg(arg)"]
 outputprogram=""
 outputatoms = []
@@ -73,6 +76,7 @@ def getBaseAndArgs(base,arg):#assuming bidmas is followed thing infront/after op
     #a^(b+c)
     base=GetArg(base,r=True)
     arg=GetArg(arg)
+    
     return base,arg
 
 def makesig(pysig,dtype):
@@ -87,10 +91,16 @@ def dtyper(operation):#adds the r in the right place to use correct function cal
     #funcname(real,comp) -->> rfuncname(real,comp)
     #funcname(come,real) -->> funcnamer(come,real)
     #funcname(comp,comp) -->> funcname(comp,comp)
+    for i in replacements1arg:
+        
+        if i[5:i.find("(")] in operation:
+            return operation
+            
     lhs=operation.find("_")
     rhs=operation.find("(")
     
-    regexp = re.compile(r"^(-?\d+)(\.\d*)?$")#regex to check for number currently rejects .123 but 0.123 is fine 
+    regexp = re.compile(r"^\(?(-? ?\d+)(\.\d*)?\)?$")#regex to check for number currently rejects .123 but 0.123 is fine 
+    #also allows for brackets around number for example (-1)
     centralcommaindex=0
     bracketcount=0
     lowestbracketcomma=9999
@@ -108,9 +118,10 @@ def dtyper(operation):#adds the r in the right place to use correct function cal
             operation[rhs+1:operation.rfind(")")][centralcommaindex+1:])#split whats between first opening bracket and last closing bracket by comma in least brackets
     else:
         args=(operation[rhs+1:operation.find(")")].split(","))
-    #print(f"split into {args}")        
+    print(f"split into {args}")        
     assert not (regexp.search(args[0]) and regexp.search(args[1]))#no variable should have been simplified
     #regex to check for number currently rejects .123 but 0.123 is fine
+    
     if bool(regexp.search(args[0])):
         operation = operation[:lhs+1]+"r"+operation[lhs+1:]
     if bool(regexp.search(args[1])):
@@ -151,6 +162,9 @@ def translate(fl,operations=operations2arg,replacements2arg=replacements2arg,out
             base,arg = getBaseAndArgs(base,arg)
             replacement=replacements2arg[c].replace("dtype_",dtype).replace("base",base.strip()).replace("arg",arg.strip())
             replacement=dtyper(replacement)
+            if operations[c] == "^": 
+                print(f"replacing {base+operations[c]+arg} with {replacement}")
+                assert arg != "(-1)"
             workingfs=workingfs.replace(base+operations[c]+arg,replacement)
         
         else:
@@ -164,7 +178,6 @@ def translate(fl,operations=operations2arg,replacements2arg=replacements2arg,out
 Fix bug with brackets inside of array index, causing inbetweenbrackets to be wrong
 make matching of variables in function def to call sig more intuitive"""
 def subsfunction(f,code,name,RemoveSemiColon=True):
-    print("\n\n\n\n\n\nin subsfunc ")
     
     
     originalargs=[]
@@ -191,10 +204,10 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
     
     for split in codesplit:
         if split.split("(")[0] == name:#split here will be the function name and its input eg "f(x)"
-            print(split)
+            
             strinbetweenbrackets=split.split("(")[1].split(")")[0]
             inbetweenbrackets=strinbetweenbrackets.split(",")
-            print(inbetweenbrackets)
+            
             #split 1 gets after first bracket, split to gets rid of after bracket, then forms list of each arg
             #inbetweenbrackets is equal to the list of argument names in function locations 
             #eg subbing somthing into __f(a,b)__ inbetween brackets would be ["a","b"]
@@ -208,47 +221,23 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
                 func=func.replace(i[0].strip()+" ",i[1].strip())#the +" " is critical
                 #it prevents variable names coincidentally appearing as substrings in other things being replaced
                 #for example when c is a variable being replaced with Const c_double goes to Const_double
+                # a better solution would find a instance of substring then somehow check adjacent to it
             if RemoveSemiColon:
                 func=func.replace(";","")
              
             code=code.replace(f"__{split}__",func)
-    print(code)
-    print("leaving subsfunc \n\n\n\n\n\n")      
     return code
 
 if __name__ == '__main__':#for testing not really intedned to be ran
-    StabilityFractalNoCycle="""
-    int Counter = 0;
-    dtype_t Const=X[i];
-    while (dtype_abs(X[i])>DivLim && Counter<N) 
-    {
-        Counter+=1;
-        X[i]=__f(X[i],Const)__;
-        Y[i]=__g(X[i],Const)__;
-    }
-   
-    """
+    
     
     x,c=sp.symbols("x,c")
-    f=c*x**2
+    f=x**2-c
     fl=sp.lambdify((x,c),f)
     print(inspect.getsource(fl))
-    flt=translate(fl)
-    print(flt)
-    mapclstr = subsfunction(flt,StabilityFractalNoCycle,"f")
     
-    print(mapclstr)
-    """   xbig,y=sp.symbols("xbig,y")
-    f=xbig**2-xbig**3-1.0+xbig+21j
-
-    fp = sp.diff(f)
-    fl=sp.lambdify((xbig),f)
-
-    fprimel=sp.lambdify(xbig,fp)
     flt=translate(fl)
-    fprimelt = translate(fprimel)
-    print(f)
     print(flt)
-    print(fp)
-    print(fprimelt)
-     """
+    
+    
+    

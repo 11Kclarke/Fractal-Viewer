@@ -72,9 +72,9 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
     if isinstance(cycles,str):
         Code=cycles
     
-    print(flt)
+    
     mapclstr = PyToPyOpenCL.subsfunction(flt,Code,"f")
-    print(mapclstr)                                                                                                          
+                                                                                                           
     mapclstr=mapclstr.replace("dtype_",dtype)
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)

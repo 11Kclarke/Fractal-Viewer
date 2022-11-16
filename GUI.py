@@ -19,10 +19,12 @@ class mainwindow:
                 options[i]=options[i].get()
             except AttributeError:
                 options[i]=options[i]["text"]
-        if options['Cycle Detection']:
+        if not (options['Cycle Detection'].lower() in ["false","n","no","0"]):
             cycles=10
         else:
             cycles=0
+         
+        Seedfunc=options["Seed Function"].lower()
          
         if options["Tolerance for cycle Detection"].lower() != "auto": 
             try:
@@ -34,14 +36,23 @@ class mainwindow:
             
         extent=options['Extent/Corners in form x1,x2,y1,y2'].split(",")
         extent=list(map(float,extent))
-        
+        if options['Colour from Iteration Count'].lower() in ["false","n","no","0"]:
+            ittcountcolouring=False
+        else:
+            ittcountcolouring=True
+        if options["Use Custom Input"] == "False":
+            if options["Use preselected"]=="Reciprocal Mandlebrot":
+                Seedfunc="1/(x**2+c)"
+                if options["Use Preselected Args With Preselected Function"]=="True":
+                    extent=[1,-0.5,1,-0.5]    
         DrawStabilityFractalOpencl(*extent,
-                                   options["Seed Function"].lower(),
+                                   Seedfunc,
                                    maxdepth=int(options['Max Iteration/Depth']),
                                    cycles=cycles,
-                                   ittcountcolouring =options['Colour from Iteration Count'],
+                                   ittcountcolouring =ittcountcolouring,
                                    npoints=int(options["SideLength if square (pixels)"]),
-                                   cycleacc=cycleacc)
+                                   cycleacc=cycleacc,
+                                   Divlim=float(options["Divergence Limit"]))
         
     def NewtonsFrac(self):
         options=self.AllOptions["Newtons"].copy()
@@ -75,7 +86,7 @@ class mainwindow:
         if options["Use Custom Input"] == "False":
             if options["Use preselected"]=="Gumowski_Mira":
                 print("Gumowski_Mira")
-                if options["Use Preselected Args With Preselected Function"]=="False":
+                if options["Use Preselected Args With Preselected Function"]=="True":
                     args = [1,np.cos(4*np.pi/5)+0.008,  0.01, 0, 0]
                     SideLength = 500
                     IttLim=50
@@ -216,7 +227,8 @@ class mainwindow:
 M=mainwindow()
 
 M.CreateAndLabelSwitch("Use Custom Input","True","Stability")
-M.CreateAndLabelDropdown("Use preselected","MandleBrot","Stability",["Exponential","more to be added"])
+M.CreateAndLabelDropdown("Use preselected","MandleBrot","Stability",["Reciprocal Mandlebrot","more to be added"])
+M.CreateAndLabelSwitch("Use Preselected Args With Preselected Function","True","Stability")
 M.CreateAndLabelEntry("Extent/Corners in form x1,x2,y1,y2","2,-2,2,-2","Stability")
 M.CreateAndLabelEntry("Seed Function","x**2+c","Stability")
 M.CreateAndLabelEntry("SideLength if square (pixels)",1028,"Stability")
@@ -224,6 +236,8 @@ M.CreateAndLabelEntry("Max Iteration/Depth",2056,"Stability")
 M.CreateAndLabelEntry("Cycle Detection",True,"Stability")
 M.CreateAndLabelEntry("Colour from Iteration Count",True,"Stability")
 M.CreateAndLabelEntry("Tolerance for cycle Detection","Auto","Stability")
+M.CreateAndLabelEntry("Divergence Limit","2","Stability")
+
 
 M.CreateAndLabelSwitch("Use Custom Input","True","Newtons")
 M.CreateAndLabelDropdown("Use preselected","X**3+1","Newtons",["Exponential","more to be added"])
@@ -235,11 +249,11 @@ M.CreateAndLabelEntry("Root Found Tolerance",1e-16,"Newtons")
 
 M.CreateAndLabelSwitch("Use Custom Input","True","Attractor")
 M.CreateAndLabelDropdown("Use preselected","Hoppalong","Attractor",["Gumowski_Mira","more to be added"])
+M.CreateAndLabelSwitch("Use Preselected Args With Preselected Function","True","Attractor")
 M.CreateAndLabelEntry("Extent/Corners in form x1,x2,y1,y2","2,-2,2,-2","Attractor")
 M.CreateAndLabelEntry("X updateFunc in X,Y,K1,K2,K3,K4,K5,X0,Y0","Y-sign(X)*(sqrt(fabs(k2*X-k3)))","Attractor")
 M.CreateAndLabelEntry("Y updateFunc in X,Y,K1,K2,K3,K4,K5,XN,Y0","k1- X","Attractor")
 M.CreateAndLabelEntry("Constants in form K1,K2,K3,K4,K5","2,1,0,0,0","Attractor")
-M.CreateAndLabelSwitch("Use Preselected Args With Preselected Function","True","Attractor")
 M.CreateAndLabelEntry("SideLength if square (pixels)",500,"Attractor")
 M.CreateAndLabelEntry("Res of Orbit",300,"Attractor")
 M.CreateAndLabelEntry("Orbit IttLim",1e6,"Attractor")

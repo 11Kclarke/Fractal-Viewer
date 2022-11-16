@@ -174,7 +174,7 @@ def DrawNewtonsFractalOpencl(x1,x2,y1,y2,fl,fprimel=None,npoints=1000, maxdepth=
     Roots,extent=innerwrap(x1,x2,y1,y2)
     GUI(Roots,extent,innerwrap)
     
-def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1024, maxdepth=3000,cycles=16,cycleacc=None,ittcountcolouring=True):
+def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1024, maxdepth=3000,cycles=16,cycleacc=None,ittcountcolouring=True,Divlim=2):
     if isinstance(fl,str):
         fl=parse_expr(fl)
         fl=sp.lambdify((x,c),fl)
@@ -182,7 +182,7 @@ def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1024, maxdepth=3000,cycles
         fl=sp.lambdify((x,c),fl)
     
     innerwrap = PyopenclStabilityFractal.WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=npoints, maxdepth=maxdepth,cycles=cycles,
-                                                             cycleacc=cycleacc,ittCountColouring=ittcountcolouring)
+                                                             cycleacc=cycleacc,ittCountColouring=ittcountcolouring,Divlim=Divlim)
     Roots,extent=innerwrap(x1,x2,y1,y2)
     #Roots=np.log(abs(Roots))
     GUI(Roots,extent,innerwrap)
