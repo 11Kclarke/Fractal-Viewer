@@ -1,13 +1,12 @@
 import numpy as np
 import pyopencl as cl
-import pyopencl.array
 from pyopencl.elementwise import ElementwiseKernel
 import os
 import matplotlib.pyplot as plt
 import sympy as sp
 import timeit
 import PyToPyOpenCL#mine
-
+from numba import njit,prange
 """Possible issue with input funcs where the derivative near 0 is tiny and actual func isnt ie x^n+c with large N"""
 
 os.environ["PYOPENCL_CTX"]="0"
@@ -58,24 +57,21 @@ def createstartvalssimp(x1,x2,y1,y2,SideLength):#this essentially creates a flat
         Vals[i*SideLength:i*SideLength+SideLength]+=Ys[i]#every y val repeated side length times"""
     return Vals#can be reshaped into square grid    
 
+#@njit(parallel=True)
 def createstartvals(x1,x2,y1,y2,SideLength):#this essentially creates a flattened grid for using as input into pyopenclfuncs
-    
-        
     Xlength=int(np.ceil(abs((x1-x2)/(y1-y2)*SideLength)))
-    
     Ylength=int(np.ceil((SideLength**2)/Xlength))
-    
-    Xs=np.linspace(-x1*1j,-x2*1j,Xlength,dtype=np.complex128)
-    Ys=np.linspace(y1,y2,Ylength)
-    Vals=np.zeros(Xlength*Ylength,dtype=np.complex128)
+    Xs=np.linspace(-x1*1j,-x2*1j,Xlength).astype(np.complex128)
+    Ys=np.linspace(y1,y2,Ylength).astype(np.complex128)
+    Vals=np.zeros(Xlength*Ylength).astype(np.complex128)
     """for i,x in enumerate(Xs):
         for j,y in enumerate(Ys):
             Vals[i,j]=x+y"""
     
-    for i in range(Xlength):
+    for i in prange(Xlength):
         Vals[i*Ylength:i*Ylength+Ylength]=Ys
         Vals[i*Ylength:i*Ylength+Ylength]+=Xs[i]#every y val repeated side length times
-    return Vals.reshape(Xlength,Ylength)
+    return Vals,(Xlength,Ylength)
     
     
 
@@ -83,7 +79,8 @@ def NewtonsFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,tol=1e-12,maxdepth
     
     #starttime = timeit.default_timer()
     extent = [x1,x2,y1,y2]
-    InnitialValues=createstartvals(x1,x2,y1,y2,SideLength)
+    InnitialValues,shape=createstartvals(x1,x2,y1,y2,SideLength)
+    InnitialValues.reshape(shape)
     Roots=cl.array.to_device(queue,InnitialValues) 
     mapcl(Roots,np.intc(maxdepth),np.float64(tol))
     Roots=Roots.get() 

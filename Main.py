@@ -48,7 +48,7 @@ def plotfract(cmap,stabilities=None,extent=None,plottype=None,ax=None,shape=None
         if plottype=="imshow":
             minval=np.min(stabilities)
             maxval=np.max(stabilities)
-            if maxval-minval>1000:
+            if maxval-minval>1000 and minval<0:
                 if minval>0:minval=-0.01
                 if maxval<0:maxval=0.01
                 maxval*=1/30
@@ -227,7 +227,7 @@ if __name__ == '__main__':
     maxdepth = 2048
     f=x**2+c
     
-    DrawStabilityFractalOpencl(-2,2,-2,2,f,maxdepth=maxdepth,npoints=res,cycles=10,ittcountcolouring=True,variation="Burning Ship")
+    DrawStabilityFractalOpencl(-2,2,-2,2,f,maxdepth=maxdepth,npoints=res,cycles=10,ittcountcolouring=True)
     #DrawNewtonsfractalOpencl(-1,1,-1,1,fl,fpl,npoints=res,maxdepth=500,tol=1e-6)
     
     #drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)

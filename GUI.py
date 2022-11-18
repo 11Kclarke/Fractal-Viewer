@@ -35,6 +35,8 @@ class mainwindow:
         else:cycleacc=None
         if options["Algorithm variations"]=="Burning Ship":
             variation="Burning Ship"
+        elif options["Algorithm variations"]=="Tricorn":
+            variation="Tricorn"
         else:
             variation=""    
         extent=options['Extent/Corners in form x1,x2,y1,y2'].split(",")
@@ -230,7 +232,7 @@ class mainwindow:
 M=mainwindow()
 
 M.CreateAndLabelSwitch("Use Custom Input","True","Stability")
-M.CreateAndLabelDropdown("Algorithm variations","Standard Mandlebrot like","Stability",["Burning Ship","more to be added"])
+M.CreateAndLabelDropdown("Algorithm variations","Standard Mandlebrot like","Stability",["Burning Ship","Tricorn"])
 M.CreateAndLabelDropdown("Use Preselected Function","MandleBrot","Stability",["Reciprocal Mandlebrot","more to be added"])
 M.CreateAndLabelSwitch("Use Preselected Args With Preselected Function","True","Stability")
 M.CreateAndLabelEntry("Extent/Corners in form x1,x2,y1,y2","2,-2,2,-2","Stability")

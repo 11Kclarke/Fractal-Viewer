@@ -91,7 +91,7 @@ def GetArg(arg,r=False,diagnosticmode=False):
     if arg.find(openbracet)>arg.find(closebracet) or ((not (openbracet in arg)) and closebracet in arg) and not "," in arg[:arg.find(closebracet)]:
         arg=arg[:arg.find(closebracet)]#if close bracket appears before open bracket operator must have been in bracket
         #this is prolly why i had bracket count being compared to -1 not 0 in prev iterations
-        print("leaving from sketchy if statment")
+        #print("leaving from sketchy if statment")
     else:
         bracketcount=0
         startedcounting=False

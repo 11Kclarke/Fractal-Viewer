@@ -13,7 +13,7 @@ os.environ["PYOPENCL_CTX"]="0"
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 
 Burningshipvariation="Xn=(dtype_t){fabs(Xn.real),fabs(Xn.imag)};"
-
+Tricornpvariation="Xn=dtype_conj(Xn);"
 
 StabilityFractalNoCycle="""
     int n = 0;
@@ -31,33 +31,25 @@ StabilityFractalNoCycle="""
 #implementation of gospers algorithm modified from hackers delight. 
 StabilityFractalWithCycle="""
 short k,kmax,m,n;
-bool notfound = true;  
-bool notdiverged = true;
 dtype_t T[maxCyclelog2+1];
 dtype_t Xn=X[i];//should prolly be 0
 dtype_t Const = Xn;
 T[0] = Xn;
-X[i].real = 0;
-Xn.real = 0;
-Xn.imag = 0;
 for (n = 1; n<N; n++) {
     __variation_mode__;
     Xn =__f(Xn,Const)__;
-    
     kmax = maxCyclelog2-1 - clz(n); // Floor(log2 n).
     for (k = 0; k <= kmax; k++) {
-        if (dtype_abs(dtype_add(Xn,dtype_neg(T[k])))<cycleacc){
+        if (dtype_abs_squared(dtype_add(Xn,dtype_neg(T[k])))<cycleacc){
             // Compute m = max{i | i < n and ctz(i+1) = k}.
             m = ((((n >> k) - 1) | 1) << k) - 1;
             X[i].real =m-n;
-            notfound=false;
             n=N+1;
         } 
     }
     T[popcount(~((n+1) | -(n+1)))] = Xn; // No match.
     if (dtype_abs_squared(Xn)>DivLim){
         X[i].real=__colouring_mode__;
-        notdiverged = false;
         n=N+2;
     }   
 }
@@ -92,7 +84,7 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
     else:
         preamble="""
         #define PYOPENCL_DEFINE_CDOUBLE 
-        #pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
+        //#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
         #include <pyopencl-complex.h>
         
         __constant int maxCyclelog2 = """+str(cycles)+"""; // should be set to 32 nearly always
@@ -103,26 +95,22 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
 def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,DivLim=2.0,maxdepth=30,cycles=32,cycleacc=None,shuffle=False):
     DivLim=DivLim**2
     extent = [x1,x2,y1,y2]
-    print(f"{extent} from inside fractgen")
-    Stabilities=createstartvals(x1,x2,y1,y2,SideLength)
-    Stabilities=Stabilities.flatten()
+    #print(f"{extent} from inside fractgen")
+    Stabilities,shape=createstartvals(x1,x2,y1,y2,SideLength)
+    Xlength,Ylength=shape
     
     if shuffle:
         orderTemplate = np.arange(SideLength**2)
         shuf_order = orderTemplate
         np.random.shuffle(shuf_order)
-        Stabilities=Stabilities[shuf_order]
-        
+        Stabilities=Stabilities[shuf_order]   
     Stabilities=cl.array.to_device(queue,Stabilities)
-    Xlength=int(np.ceil(abs((x1-x2)/(y1-y2)*SideLength)))
-    Ylength=int(np.ceil((SideLength**2)/Xlength))
-    
     if cycles==False or int(cycles) == 0:#not sure about behaviour of not cycles when cycles not a bool
         mapcl(Stabilities,maxdepth,np.float64(DivLim))
     else:
         if cycleacc == None:
-            cycleacc=np.sqrt((((x1-x2)**2+(y1-y2)**2)/(Xlength**2+Ylength**2)))
-            #default threshold is 50% of diagonal length of 1 pixel 
+            cycleacc=((x1-x2)**2+(y1-y2)**2)/(Xlength**2+Ylength**2)#removed sqrt
+            #default threshold  diagonal length of 1 pixel 
             #print(f"cycle tolerance auto calced as {cycleacc}")
         mapcl(Stabilities,maxdepth,np.float64(DivLim),np.float64(cycleacc))
         
@@ -137,8 +125,8 @@ def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,DivLim=2.0,maxde
 
 def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype="cdouble_"
                     ,Code=StabilityFractalNoCycle,cycles=False,cycleacc=1e-5,ittCountColouring=True,variationmode=""):
-    if variationmode == "Burning Ship":
-        variationmode=Burningshipvariation
+    if variationmode == "Burning Ship":variationmode=Burningshipvariation  
+    if variationmode == "Tricorn":variationmode=Tricornpvariation
     openclfunc,queue= PrepStabilityFractalGPU(fl,dtype=dtype,cycles=cycles,ittCountColouring=ittCountColouring,variation=variationmode)
     def innerwrap(x1,x2,y1,y2):
         return StabilityFractalPyOpenCL(x1,x2,y1,y2,npoints,openclfunc,queue,DivLim=Divlim,maxdepth=maxdepth,cycles=cycles,cycleacc=cycleacc)
@@ -151,14 +139,25 @@ if __name__ == '__main__':#not really intended to be script just here for testin
 
 
    
-    
-    SideLength=500
-    
-    mapcl,queue=PrepStabilityFractalGPU(fl,cycles=16,ittCountColouring=True)
-    
-    starttime = timeit.default_timer()
-    Roots,extent=StabilityFractalPyOpenCL(-2,2,-2,2,512,mapcl,queue,maxdepth=2000,cycles=16)
-    print(timeit.default_timer()-starttime)
+    mapcl,queueorig=PrepStabilityFractalGPU(fl,cycles=16,ittCountColouring=True)
+    queue=queueorig
+    k=200
+    #starttime = timeit.default_timer()
+    max=totaltime=0
+    for i in range(k):
+        starttime = timeit.default_timer()
+        Roots,extent=StabilityFractalPyOpenCL(-2,2,-2,2,1000,mapcl,queue,maxdepth=2000,cycles=16)
+        totaltime+=(timeit.default_timer()-starttime)
+        if (timeit.default_timer()-starttime)>max:max=(timeit.default_timer()-starttime)
+    #SideLength=500
+    print(f"total time {totaltime} average {totaltime/k}, longest run {max}")
     
     plt.imshow(Roots,extent=extent)
     plt.show(block=True)
+    """pre changes:
+    total time 20.84446890000001 average 0.10422234450000005, longest run 0.14043470000000013
+    Removed sqrt from cycle finder:
+    15.368186800000009 average 0.07684093400000004, longest run 0.3338751999999996
+    removed some no longer needed bools
+    total time 15.128090599999991 average 0.07564045299999995, longest run 0.3307941999999997
+    """
