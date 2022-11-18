@@ -12,12 +12,16 @@ from PyopenclNewtonsFractal import createstartvals#mine
 os.environ["PYOPENCL_CTX"]="0"
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 
+Burningshipvariation="Xn=(dtype_t){fabs(Xn.real),fabs(Xn.imag)};"
+
+
 StabilityFractalNoCycle="""
     int n = 0;
     dtype_t Const=X[i];//dont rename
     bool notfound = true;
     while (dtype_abs(X[i])<DivLim && n<N) 
     {
+        Xn =__variation_mode__;
         n+=1;
         X[i]=__f(X[i],Const)__;
     }
@@ -30,12 +34,16 @@ short k,kmax,m,n;
 bool notfound = true;  
 bool notdiverged = true;
 dtype_t T[maxCyclelog2+1];
-dtype_t Xn=X[i];
+dtype_t Xn=X[i];//should prolly be 0
 dtype_t Const = Xn;
 T[0] = Xn;
 X[i].real = 0;
+Xn.real = 0;
+Xn.imag = 0;
 for (n = 1; n<N; n++) {
+    __variation_mode__;
     Xn =__f(Xn,Const)__;
+    
     kmax = maxCyclelog2-1 - clz(n); // Floor(log2 n).
     for (k = 0; k <= kmax; k++) {
         if (dtype_abs(dtype_add(Xn,dtype_neg(T[k])))<cycleacc){
@@ -56,7 +64,7 @@ for (n = 1; n<N; n++) {
     """
 
 """Fl seed func, cycles false or 0 for no cycle detection int for number of cycles"""
-def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=False):
+def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=False,variation=""):
     if isinstance(fl,str):
         fl=sp.lambdify(x,fl)
     flt=PyToPyOpenCL.translate(fl)
@@ -72,6 +80,7 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
     if isinstance(cycles,str):
         Code=cycles
     
+    Code= Code.replace("__variation_mode__;",variation)
     
     mapclstr = PyToPyOpenCL.subsfunction(flt,Code,"f")
                                                                                                            
@@ -94,6 +103,7 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
 def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,DivLim=2.0,maxdepth=30,cycles=32,cycleacc=None,shuffle=False):
     DivLim=DivLim**2
     extent = [x1,x2,y1,y2]
+    print(f"{extent} from inside fractgen")
     Stabilities=createstartvals(x1,x2,y1,y2,SideLength)
     Stabilities=Stabilities.flatten()
     
@@ -126,8 +136,10 @@ def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,DivLim=2.0,maxde
     return Stabilities.reshape(Xlength,Ylength),extent
 
 def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype="cdouble_"
-                    ,Code=StabilityFractalNoCycle,cycles=False,cycleacc=1e-5,ittCountColouring=True):
-    openclfunc,queue= PrepStabilityFractalGPU(fl,dtype=dtype,cycles=cycles,ittCountColouring=ittCountColouring)
+                    ,Code=StabilityFractalNoCycle,cycles=False,cycleacc=1e-5,ittCountColouring=True,variationmode=""):
+    if variationmode == "Burning Ship":
+        variationmode=Burningshipvariation
+    openclfunc,queue= PrepStabilityFractalGPU(fl,dtype=dtype,cycles=cycles,ittCountColouring=ittCountColouring,variation=variationmode)
     def innerwrap(x1,x2,y1,y2):
         return StabilityFractalPyOpenCL(x1,x2,y1,y2,npoints,openclfunc,queue,DivLim=Divlim,maxdepth=maxdepth,cycles=cycles,cycleacc=cycleacc)
     return innerwrap
@@ -145,7 +157,7 @@ if __name__ == '__main__':#not really intended to be script just here for testin
     mapcl,queue=PrepStabilityFractalGPU(fl,cycles=16,ittCountColouring=True)
     
     starttime = timeit.default_timer()
-    Roots,extent=StabilityFractalPyOpenCL(1,-1,1,-1,512,mapcl,queue,maxdepth=2000,cycles=16,shuffle=True)
+    Roots,extent=StabilityFractalPyOpenCL(-2,2,-2,2,512,mapcl,queue,maxdepth=2000,cycles=16)
     print(timeit.default_timer()-starttime)
     
     plt.imshow(Roots,extent=extent)

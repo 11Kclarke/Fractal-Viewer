@@ -44,6 +44,7 @@ add line fractals such as sepinski triangle"""
 
 
 def plotfract(cmap,stabilities=None,extent=None,plottype=None,ax=None,shape=None):    
+        print(f"{extent} from inside plotting")
         if plottype=="imshow":
             minval=np.min(stabilities)
             maxval=np.max(stabilities)
@@ -83,10 +84,16 @@ def GUI(stabilities,extent,generator,plottype="imshow",cmap="terrain",Grid=False
     ax.set_aspect("auto")
     plt.grid(Grid)
     ax.set(title='Press H for help')
+    print(extent)
+    
+    ax.spines.left.set_position('zero')
+    ax.spines.right.set_color('none')
+    ax.spines.bottom.set_position('zero')
+    ax.spines.top.set_color('none')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.yaxis.set_ticks_position('left')
     ax.set_xlim(extent[0],extent[1])
     ax.set_ylim(extent[2],extent[3])
-    ax.spines['left'].set_position(('zero'))
-    ax.spines['bottom'].set_position('zero')
     shape=np.shape(stabilities)
     #over use of kwargs so it can be easily caleable from buttom press
     #ax.imshow(stabilities,extent=extent,origin='lower')
@@ -125,24 +132,33 @@ def GUI(stabilities,extent,generator,plottype="imshow",cmap="terrain",Grid=False
             print("\n\n\n\n")
             print("in on press cmap is",cmap)
         if event.key=='m':
+            
+           
+            
+            ax.spines.left.set_position('zero')
+            ax.spines.right.set_color('none')
+            ax.spines.bottom.set_position('zero')
+            ax.spines.top.set_color('none')
+            ax.xaxis.set_ticks_position('bottom')
+            ax.yaxis.set_ticks_position('left')
+            xlim=ax.get_xlim()
+            ylim=ax.get_ylim()
             print("redrawing")
             print("New Axis limits:")
             print(ax.get_xlim())
             print(ax.get_ylim())
             
-            xlim=ax.get_xlim()
-            ylim=ax.get_ylim()
+
             
-            ax.spines['left'].set_position(('zero'))
-            ax.spines['bottom'].set_position('zero')
-            
-            #stabilities,extent=generator(func,xlim[0],xlim[1],ylim[0],ylim[1])
+            stabilities,extent=generator(ylim[0],ylim[1],xlim[0],xlim[1])
             starttime = timeit.default_timer()
-            stabilities,extent=generator(ylim[0],ylim[1],xlim[0],xlim[1])#,npoints=npoints)
+            #stabilities,extent=generator(xlim[1],xlim[0],ylim[0],ylim[1])#,npoints=npoints)
             print("Time To Redraw:", timeit.default_timer() - starttime)
             """somwhere in the generator function the x and y are switched i cant find where but this switches them back its not a good solution"""
             extent=np.array([extent[2],extent[3],extent[0],extent[1]])
-            """This line switches the x and y coordinates back"""
+            """This line switches the x and y coordinates back
+            New 18/11/22 this bug still exists despite nearly 
+            the entire back end changing and cannot find where"""
             cmap=plotfunc(cmap,stabilities,extent,plottype,ax,shape)
             plt.draw()
     cid=fig.canvas.mpl_connect('key_press_event', on_press)
@@ -174,15 +190,16 @@ def DrawNewtonsFractalOpencl(x1,x2,y1,y2,fl,fprimel=None,npoints=1000, maxdepth=
     Roots,extent=innerwrap(x1,x2,y1,y2)
     GUI(Roots,extent,innerwrap)
     
-def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1024, maxdepth=3000,cycles=16,cycleacc=None,ittcountcolouring=True,Divlim=2):
+def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1024, maxdepth=3000,cycles=16,cycleacc=None,ittcountcolouring=True,Divlim=2,variation=""):
     if isinstance(fl,str):
         fl=parse_expr(fl)
         fl=sp.lambdify((x,c),fl)
     if isinstance(fl,sp.Basic):
         fl=sp.lambdify((x,c),fl)
-    
+    print((x1,x2,y1,y2))
     innerwrap = PyopenclStabilityFractal.WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=npoints, maxdepth=maxdepth,cycles=cycles,
-                                                             cycleacc=cycleacc,ittCountColouring=ittcountcolouring,Divlim=Divlim)
+                                                             cycleacc=cycleacc,ittCountColouring=ittcountcolouring,Divlim=Divlim,variationmode=variation)
+    
     Roots,extent=innerwrap(x1,x2,y1,y2)
     #Roots=np.log(abs(Roots))
     GUI(Roots,extent,innerwrap)
@@ -206,11 +223,11 @@ if __name__ == '__main__':
    
     starttime = timeit.default_timer()
 
-    res = 1024
-    maxdepth = 2048*2
+    res = 2000
+    maxdepth = 2048
     f=x**2+c
     
-    DrawStabilityFractalOpencl(1,-1,1,-1,f,maxdepth=maxdepth,npoints=res,cycles=16,ittcountcolouring=True)
+    DrawStabilityFractalOpencl(-2,2,-2,2,f,maxdepth=maxdepth,npoints=res,cycles=10,ittcountcolouring=True,variation="Burning Ship")
     #DrawNewtonsfractalOpencl(-1,1,-1,1,fl,fpl,npoints=res,maxdepth=500,tol=1e-6)
     
     #drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)

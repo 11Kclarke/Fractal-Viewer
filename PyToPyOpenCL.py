@@ -32,12 +32,14 @@ replacements2arg=replacements2arg[::-1]
 operations1arg=["-",
                 "sqrt",
                 "exp",
+                "tan",
                 "sin",
                 "cos"]
 #maybe sin has 1 or 2 few brackets at end
 replacements1arg = ["(dtype_neg(arg))",
                     "(dtype_powr(arg,0.5))",
                     "(dtype_rpow(2.71828182,arg))",
+                    "sin(arg)/cos(arg)",
                     "(dtype_mul((dtype_t){0.0,1.0},(dtype_add(dtype_rmul(0.5,dtype_rpow(2.71828182,(dtype_mul((dtype_t){0.0,1.0},arg)))),dtype_neg(dtype_rmul(0.5,dtype_rpow(2.71828182,(dtype_neg(dtype_mul((dtype_t){0.0,1.0},arg))))))))))",
                     "(dtype_add(dtype_rmul(0.5,dtype_rpow(2.71828182,(dtype_mul((dtype_t){0.0,1.0},arg)))),dtype_rmul(0.5,dtype_rpow(2.71828182,(dtype_neg(dtype_mul((dtype_t){0.0,1.0},arg)))))))"]#cos(x)
 

@@ -65,18 +65,18 @@ def createstartvals(x1,x2,y1,y2,SideLength):#this essentially creates a flattene
     
     Ylength=int(np.ceil((SideLength**2)/Xlength))
     
-    Xs=np.linspace(x1,x2,Xlength,dtype=np.complex128)
-    Ys=np.linspace(y1*1j,y2*1j,Ylength)
+    Xs=np.linspace(-x1*1j,-x2*1j,Xlength,dtype=np.complex128)
+    Ys=np.linspace(y1,y2,Ylength)
     Vals=np.zeros(Xlength*Ylength,dtype=np.complex128)
     """for i,x in enumerate(Xs):
         for j,y in enumerate(Ys):
             Vals[i,j]=x+y"""
     
-    for i in range(Ylength):
-        
-        Vals[i*Xlength:i*Xlength+Xlength]=Xs
-        Vals[i*Xlength:i*Xlength+Xlength]+=Ys[i]#every y val repeated side length times"""
-    return Vals.reshape(Ylength,Xlength).T
+    for i in range(Xlength):
+        Vals[i*Ylength:i*Ylength+Ylength]=Ys
+        Vals[i*Ylength:i*Ylength+Ylength]+=Xs[i]#every y val repeated side length times
+    return Vals.reshape(Xlength,Ylength)
+    
     
 
 def NewtonsFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,tol=1e-12,maxdepth=200,N=None,roundroots=True):

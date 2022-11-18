@@ -33,7 +33,10 @@ class mainwindow:
                 cycleacc=None
                 print("invalid cycle Accuracy, defaulting to auto")
         else:cycleacc=None
-            
+        if options["Algorithm variations"]=="Burning Ship":
+            variation="Burning Ship"
+        else:
+            variation=""    
         extent=options['Extent/Corners in form x1,x2,y1,y2'].split(",")
         extent=list(map(float,extent))
         if options['Colour from Iteration Count'].lower() in ["false","n","no","0"]:
@@ -41,7 +44,7 @@ class mainwindow:
         else:
             ittcountcolouring=True
         if options["Use Custom Input"] == "False":
-            if options["Use preselected"]=="Reciprocal Mandlebrot":
+            if options["Use Preselected Function"]=="Reciprocal Mandlebrot":
                 Seedfunc="1/(x**2+c)"
                 if options["Use Preselected Args With Preselected Function"]=="True":
                     extent=[1,-0.5,1,-0.5]    
@@ -52,7 +55,7 @@ class mainwindow:
                                    ittcountcolouring =ittcountcolouring,
                                    npoints=int(options["SideLength if square (pixels)"]),
                                    cycleacc=cycleacc,
-                                   Divlim=float(options["Divergence Limit"]))
+                                   Divlim=float(options["Divergence Limit"]),variation=variation)
         
     def NewtonsFrac(self):
         options=self.AllOptions["Newtons"].copy()
@@ -84,7 +87,7 @@ class mainwindow:
         extent=options['Extent/Corners in form x1,x2,y1,y2'].split(",")
         extent=list(map(float,extent))
         if options["Use Custom Input"] == "False":
-            if options["Use preselected"]=="Gumowski_Mira":
+            if options["Use Preselected Function"]=="Gumowski_Mira":
                 print("Gumowski_Mira")
                 if options["Use Preselected Args With Preselected Function"]=="True":
                     args = [1,np.cos(4*np.pi/5)+0.008,  0.01, 0, 0]
@@ -104,7 +107,7 @@ class mainwindow:
                                   Res2=Res2,
                                   N2=N2,
                                   args=args)
-            elif options["Use preselected"]=="Hoppalong":
+            elif options["Use Preselected Function"]=="Hoppalong":
                     if options["Use Preselected Args With Preselected Function"]=="True":
                         print("Hoppalong")
                         args = [1.1,0.5,  1, 0, 0]
@@ -186,10 +189,10 @@ class mainwindow:
         #print(self.AllOptions)
         
         Dropdown= tk.OptionMenu(CurFrame,tk.StringVar(CurFrame,defaultval),defaultval,*Options)
-        #Dropdownlabel=tk.Label(CurFrame,text=label)
+        Dropdownlabel=tk.Label(CurFrame,text=label)
         #Dropdown.insert(-1,str(defaultval))
-        Dropdown.grid(row=OptionCount+1,column=0,pady=2)
-        #Dropdownlabel.grid(row=OptionCount+1,column=0,padx=2)
+        Dropdown.grid(row=OptionCount+2,column=0,pady=2)
+        Dropdownlabel.grid(row=OptionCount+1,column=0,padx=2)
         self.AllOptions[FracType][label]=Dropdown    
         #print(OptionCount)
     def __init__(self):
@@ -227,10 +230,11 @@ class mainwindow:
 M=mainwindow()
 
 M.CreateAndLabelSwitch("Use Custom Input","True","Stability")
-M.CreateAndLabelDropdown("Use preselected","MandleBrot","Stability",["Reciprocal Mandlebrot","more to be added"])
+M.CreateAndLabelDropdown("Algorithm variations","Standard Mandlebrot like","Stability",["Burning Ship","more to be added"])
+M.CreateAndLabelDropdown("Use Preselected Function","MandleBrot","Stability",["Reciprocal Mandlebrot","more to be added"])
 M.CreateAndLabelSwitch("Use Preselected Args With Preselected Function","True","Stability")
 M.CreateAndLabelEntry("Extent/Corners in form x1,x2,y1,y2","2,-2,2,-2","Stability")
-M.CreateAndLabelEntry("Seed Function","cos(x+c)","Stability")
+M.CreateAndLabelEntry("Seed Function","x**2+c","Stability")
 M.CreateAndLabelEntry("SideLength if square (pixels)",1028,"Stability")
 M.CreateAndLabelEntry("Max Iteration/Depth",2056,"Stability") 
 M.CreateAndLabelEntry("Cycle Detection",True,"Stability")
@@ -240,7 +244,7 @@ M.CreateAndLabelEntry("Divergence Limit","2","Stability")
 
 
 M.CreateAndLabelSwitch("Use Custom Input","True","Newtons")
-M.CreateAndLabelDropdown("Use preselected","X**3+1","Newtons",["Exponential","more to be added"])
+M.CreateAndLabelDropdown("Use Preselected Function","X**3+1","Newtons",["Exponential","more to be added"])
 M.CreateAndLabelEntry("Extent/Corners in form x1,x2,y1,y2","2,-2,2,-2","Newtons")
 M.CreateAndLabelEntry("Seed Function","x**3+1","Newtons")
 M.CreateAndLabelEntry("SideLength if square (pixels)",1028,"Newtons")
@@ -248,7 +252,7 @@ M.CreateAndLabelEntry("Max Iteration/Depth",2056,"Newtons")
 M.CreateAndLabelEntry("Root Found Tolerance",1e-16,"Newtons") 
 
 M.CreateAndLabelSwitch("Use Custom Input","True","Attractor")
-M.CreateAndLabelDropdown("Use preselected","Hoppalong","Attractor",["Gumowski_Mira","more to be added"])
+M.CreateAndLabelDropdown("Use Preselected Function","Hoppalong","Attractor",["Gumowski_Mira","more to be added"])
 M.CreateAndLabelSwitch("Use Preselected Args With Preselected Function","True","Attractor")
 M.CreateAndLabelEntry("Extent/Corners in form x1,x2,y1,y2","2,-2,2,-2","Attractor")
 M.CreateAndLabelEntry("X updateFunc in X,Y,K1,K2,K3,K4,K5,X0,Y0","Y-sign(X)*(sqrt(fabs(k2*X-k3)))","Attractor")
