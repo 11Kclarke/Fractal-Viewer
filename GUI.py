@@ -124,7 +124,7 @@ class mainwindow:
                                     N2=N2,
                                     args=args)
         else:
-            print(args)   
+              
             AttractorExplorer(*extent,
                             IttLim,
                             options["X updateFunc in X,Y,K1,K2,K3,K4,K5,X0,Y0"].lower(),
@@ -182,8 +182,8 @@ class mainwindow:
         #prolly a simpler way but seems to work fine
         CurFrame=self.frames[FracType]
         OptionCount=len(self.AllOptions[FracType])*2
-        print(len(self.AllOptions[FracType]))
-        print(self.AllOptions)
+        #print(len(self.AllOptions[FracType]))
+        #print(self.AllOptions)
         
         Dropdown= tk.OptionMenu(CurFrame,tk.StringVar(CurFrame,defaultval),defaultval,*Options)
         #Dropdownlabel=tk.Label(CurFrame,text=label)
@@ -191,7 +191,7 @@ class mainwindow:
         Dropdown.grid(row=OptionCount+1,column=0,pady=2)
         #Dropdownlabel.grid(row=OptionCount+1,column=0,padx=2)
         self.AllOptions[FracType][label]=Dropdown    
-        print(OptionCount)
+        #print(OptionCount)
     def __init__(self):
         
         #Create Panedwindow  
@@ -230,7 +230,7 @@ M.CreateAndLabelSwitch("Use Custom Input","True","Stability")
 M.CreateAndLabelDropdown("Use preselected","MandleBrot","Stability",["Reciprocal Mandlebrot","more to be added"])
 M.CreateAndLabelSwitch("Use Preselected Args With Preselected Function","True","Stability")
 M.CreateAndLabelEntry("Extent/Corners in form x1,x2,y1,y2","2,-2,2,-2","Stability")
-M.CreateAndLabelEntry("Seed Function","x**2+c","Stability")
+M.CreateAndLabelEntry("Seed Function","cos(x+c)","Stability")
 M.CreateAndLabelEntry("SideLength if square (pixels)",1028,"Stability")
 M.CreateAndLabelEntry("Max Iteration/Depth",2056,"Stability") 
 M.CreateAndLabelEntry("Cycle Detection",True,"Stability")
