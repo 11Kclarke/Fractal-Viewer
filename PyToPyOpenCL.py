@@ -346,7 +346,8 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
     
     
     originalargs=[]
-
+    print(f)
+    
     sig,func=f
     #print(f)
     legalendchars=["=","-","/","*",",",")"]#characters allowed directly after variable
@@ -381,8 +382,8 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
             assert len(originalargs)==len(inbetweenbrackets)
             
             for i in zip(originalargs,inbetweenbrackets):#replaces args in function def with arg in location
-                #print("replacing ")
-                #print(i[0].strip(),i[1].strip())
+                print("replacing ")
+                print(i[0].strip(),i[1].strip())
                 func=func.replace(i[0].strip()+" ",i[1].strip())#the +" " is critical
                 #it prevents variable names coincidentally appearing as substrings in other things being replaced
                 #for example when c is a variable being replaced with Const c_double goes to Const_double

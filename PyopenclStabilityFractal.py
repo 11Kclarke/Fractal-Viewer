@@ -8,7 +8,7 @@ import sympy as sp
 import timeit
 import PyToPyOpenCL#mine
 from PyopenclNewtonsFractal import createstartvals#mine
-
+from numba import njit
 os.environ["PYOPENCL_CTX"]="0"
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 
@@ -90,6 +90,20 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
         __constant int maxCyclelog2 = """+str(cycles)+"""; // should be set to 32 nearly always
         """
         return ElementwiseKernel(ctx,dtype+"t"+" *X,int N,double DivLim,double cycleacc",mapclstr,"StabilityFractal",preamble=preamble),queue
+
+
+#@njit   
+def OrbitAtPixel(x,y,f,N=8,Divlim=2,variation=None):
+    x=complex(x,y)
+    Vals=np.zeros(N).astype(np.complex64)
+    Vals[0]=f(Vals[1],x)
+    for i in range(1,N):
+        Vals[i-1]=variation(Vals[i-1])
+        Vals[i]=f(Vals[i-1],x)
+        if abs(Vals[i])>Divlim:
+            return Vals[:i+1]
+    return Vals
+        
     
 
 def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,DivLim=2.0,maxdepth=30,cycles=32,cycleacc=None,shuffle=False):
@@ -123,14 +137,34 @@ def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,DivLim=2.0,maxde
     #print(np.max(Stabilities))
     return Stabilities.reshape(Xlength,Ylength),extent
 
-def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype="cdouble_"
-                    ,Code=StabilityFractalNoCycle,cycles=False,cycleacc=1e-5,ittCountColouring=True,variationmode=""):
-    if variationmode == "Burning Ship":variationmode=Burningshipvariation  
-    if variationmode == "Tricorn":variationmode=Tricornpvariation
+def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype="cdouble_",
+                        Code=StabilityFractalNoCycle,cycles=False,cycleacc=1e-5,ittCountColouring=True,
+                        variationmode="",ShowOrbits=True):
+    fljit=njit(fl,fastmath=True)
+    if variationmode == "Burning Ship":
+        variationmode=Burningshipvariation
+        def Burningship(X):
+            return complex(abs(X.real),abs(X.imag))
+        def Orbitinnerwrap(x,y):
+            return OrbitAtPixel(x,y,fljit,Divlim=Divlim,Divlimvariation=Burningship)
+    elif variationmode == "Tricorn":
+        variationmode=Tricornpvariation
+        def Tricorn(X):
+            return np.conj(X)
+        def Orbitinnerwrap(x,y):
+            return OrbitAtPixel(x,y,fljit,Divlim=Divlim,variation=Tricorn)
+    else:
+
+        def identity(X):
+            return X
+        def Orbitinnerwrap(x,y):
+            return OrbitAtPixel(x,y,fljit,Divlim=Divlim,variation=identity)
     openclfunc,queue= PrepStabilityFractalGPU(fl,dtype=dtype,cycles=cycles,ittCountColouring=ittCountColouring,variation=variationmode)
     def innerwrap(x1,x2,y1,y2):
         return StabilityFractalPyOpenCL(x1,x2,y1,y2,npoints,openclfunc,queue,DivLim=Divlim,maxdepth=maxdepth,cycles=cycles,cycleacc=cycleacc)
-    return innerwrap
+    
+    
+    return innerwrap,Orbitinnerwrap
 
 if __name__ == '__main__':#not really intended to be script just here for testing and demo
     x,c=sp.symbols("x,c")
@@ -138,7 +172,7 @@ if __name__ == '__main__':#not really intended to be script just here for testin
     fl=sp.lambdify((x,c),f)
 
 
-   
+"""
     mapcl,queueorig=PrepStabilityFractalGPU(fl,cycles=16,ittCountColouring=True)
     queue=queueorig
     k=200
@@ -153,8 +187,8 @@ if __name__ == '__main__':#not really intended to be script just here for testin
     print(f"total time {totaltime} average {totaltime/k}, longest run {max}")
     
     plt.imshow(Roots,extent=extent)
-    plt.show(block=True)
-    """pre changes:
+    plt.show(block=True)"""
+"""pre changes:
     total time 20.84446890000001 average 0.10422234450000005, longest run 0.14043470000000013
     Removed sqrt from cycle finder:
     15.368186800000009 average 0.07684093400000004, longest run 0.3338751999999996

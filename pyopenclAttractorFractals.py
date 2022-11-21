@@ -28,22 +28,23 @@ def prepAttractorCl(f,g,dtype=float):
         
         
         """]
-    f=f.replace("y","Y[i]")
-    f=f.replace("x","X[i]")
-    g=g.replace("y","Y[i]")
-    g=g.replace("x","X[i]")
+    f=f.replace("y","Y[i] ")
+    f=f.replace("x","X[i] ")
+    g=g.replace("y","Y[i] ")
+    g=g.replace("x","X[i] ")
     f=("float X[i],float Y[i],float k1,float k2, float k3,float k4,float k5,float X0, float Y0".split(","),f)
     g=("float X[i],float Y[i],float k1,float k2, float k3,float k4,float k5,float XN, float Y0".split(","),g)
     mapclstr[1]=subsfunction(f,mapclstr[1],"f",RemoveSemiColon=False)
     mapclstr[1]=subsfunction(g,mapclstr[1],"g",RemoveSemiColon=False)
-    
+    print(f)
+    print(g)
     if dtype == np.float64:
             mapclstr[1] = mapclstr[1].replace("float","double")
             mapclstr[1] = mapclstr[1].replace("float","double")
             mapclstr[0] = mapclstr[0].replace("float","double")
             mapclstr[0] = mapclstr[0].replace("float","double")
-    """for i in mapclstr[1].split("\n"):
-        print(i)"""
+    for i in mapclstr[1].split("\n"):
+        print(i)
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
     mapcl = ElementwiseKernel(ctx,*mapclstr,"mapcl")
@@ -244,16 +245,18 @@ if __name__ == '__main__':
     Gumowski_MiraF = "(k2*x + (2*(1-k2)*x*x/(1.0 + x*x)))"
     Gumowski_Mirax="k1*y+k3*y*(1-k3*y*y)+"+Gumowski_MiraF
     Gumowski_Miray="-x+"+Gumowski_MiraF.replace("x","XN") #(k2 * XN + (2*(1 - k2)*XN*XN/(1.0 + XN*XN)))"
-    AttractorExplorer(*extent,IttLim,Gumowski_Mirax,Gumowski_Miray,SideLength,Res2=500,N2=int(1e6),args=[1,np.cos(4*np.pi/5)+0.008,  0.1, 0, 0],orbitstart=(0, 0),Aggfunc=prepdataDiff)
+    AttractorExplorer(*extent,IttLim,hoppalongx,hoppalongy,SideLength,Res2=500,N2=int(1e6),args=[2,1,  0, 0, 0],orbitstart=(0, 0),Aggfunc=prepdataDiff)
     
-    """
-   
+    
+"""
     time = timeit.default_timer()
     Xs,Ys=PrepAttractorData(*extent,SideLength,IttLim,dtype=dtype)
     print(timeit.default_timer()-time)
     #Xs[:,0]=np.array([1,2]).astype(dtype)
     #Ys[:,0]=np.array([1,2]).astype(dtype)
-    
+    prepAttractorCl()
+    ctx = cl.create_some_context()
+    queue = cl.CommandQueue(ctx)
     Xs=cl.array.to_device(queue, Xs)
     Ys=cl.array.to_device(queue, Ys)
     
@@ -264,14 +267,15 @@ if __name__ == '__main__':
     Ys=Ys.get().T
     print(timeit.default_timer()-time)
     Hoppalongiterations=np.stack((Xs,Ys),axis=1)
-   """
+    
     mapclstr=["float k1,float k2, float k3, float *Xs,float *Ys,float *resY,float *resX","""
-    resY[i] =k1- Xs[i];
-    resX[i]= Ys[i]-sign(Xs[i])*( sqrt(fabs(k2*Xs[i]-k3)));
-    Xs[i]=resX[i];
-    Ys[i]=resY[i];
-    """]
-    """
+    #resY[i] =k1- Xs[i];
+    #resX[i]= Ys[i]-sign(Xs[i])*( sqrt(fabs(k2*Xs[i]-k3)));
+    #Xs[i]=resX[i];
+    #Ys[i]=resY[i];
+"""
+    ]
+    
     #Hoppalongiterations = iterateOpencl(*extent,N,mapclstr,SideLength)
     print(timeit.default_timer()-time)
    
@@ -281,8 +285,8 @@ if __name__ == '__main__':
     plt.imshow(resultrange,extent=extent)
     
     plt.show()
+    """
 
-"""
 
 
 

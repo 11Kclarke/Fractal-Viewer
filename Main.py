@@ -4,6 +4,7 @@ from tokenize import Exponent
 import matplotlib as mpl
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.backends import backend_tkagg as tkagg
 import sympy as sp
 from sympy.utilities.lambdify import lambdify
 from sympy.parsing.sympy_parser import parse_expr
@@ -78,12 +79,27 @@ def plotfract(cmap,stabilities=None,extent=None,plottype=None,ax=None,shape=None
         return cmap
 
 #should prolly be a class
-def GUI(stabilities,extent,generator,plottype="imshow",cmap="terrain",Grid=False,plotfunc=plotfract):
-    
+def GUI(stabilities,extent,generator,plottype="imshow",cmap="terrain",Grid=False,plotfunc=plotfract,plotorbits=True):
+    mpl.use('TKAgg')
     fig, ax = plt.subplots()
+    """import tkinter as Tk
+    
+    root = Tk.Tk()
+    root.wm_title("Embedding in TK")
+    canvas = tkagg.FigureCanvasTkAgg(fig, master=root)
+    canvas.draw()
+    canvas.get_tk_widget().pack(side=Tk.TOP, fill=Tk.BOTH, expand=1)
+
+    toolbar = tkagg.NavigationToolbar2Tk(canvas, root)
+    toolbar.update()
+    canvas._tkcanvas.pack(side=Tk.TOP, fill=Tk.BOTH, expand=1)"""
+    
+    
     ax.set_aspect("auto")
     plt.grid(Grid)
     ax.set(title='Press H for help')
+    if len(generator)==2:
+        generator,Orbitgenerator=generator
     print(extent)
     
     ax.spines.left.set_position('zero')
@@ -134,7 +150,7 @@ def GUI(stabilities,extent,generator,plottype="imshow",cmap="terrain",Grid=False
         if event.key=='m':
             
            
-            
+            fig.canvas.flush_events()
             ax.spines.left.set_position('zero')
             ax.spines.right.set_color('none')
             ax.spines.bottom.set_position('zero')
@@ -149,9 +165,9 @@ def GUI(stabilities,extent,generator,plottype="imshow",cmap="terrain",Grid=False
             print(ax.get_ylim())
             
 
-            
-            stabilities,extent=generator(ylim[0],ylim[1],xlim[0],xlim[1])
             starttime = timeit.default_timer()
+            stabilities,extent=generator(ylim[0],ylim[1],xlim[0],xlim[1])
+            
             #stabilities,extent=generator(xlim[1],xlim[0],ylim[0],ylim[1])#,npoints=npoints)
             print("Time To Redraw:", timeit.default_timer() - starttime)
             """somwhere in the generator function the x and y are switched i cant find where but this switches them back its not a good solution"""
@@ -160,8 +176,42 @@ def GUI(stabilities,extent,generator,plottype="imshow",cmap="terrain",Grid=False
             New 18/11/22 this bug still exists despite nearly 
             the entire back end changing and cannot find where"""
             cmap=plotfunc(cmap,stabilities,extent,plottype,ax,shape)
+            
             plt.draw()
-    cid=fig.canvas.mpl_connect('key_press_event', on_press)
+            #canvas.draw()
+    
+    if plotorbits:
+        print("plottinf orbits")
+        def mouse_move(event):
+            x, y = event.xdata, event.ydata
+            if x and y and event.key=="control":
+                print((x,y,event.key))
+                fig.canvas.flush_events()
+                #canvas.flush_events()
+                Orbit=Orbitgenerator(x,y)
+                #fig.canvas.blit(fig.bbox)
+                #
+                for i in ax.lines:
+                    ax.lines.remove(i)
+                
+                ax.plot(np.real(Orbit),np.imag(Orbit),"bo-")
+                plt.draw()
+                #mpl.backends.backend_tkagg.blit()
+                
+                
+                
+                
+                
+                #tkagg.FigureCanvasTkAgg.draw(*Lines)
+                #ax.draw_artist(*Lines)
+                #ax.plot(Lines)
+                
+                
+                #tkagg.FigureCanvasTkAgg.blit
+        fig.canvas.mpl_connect('motion_notify_event', mouse_move)
+    #cid=fig.canvas.mpl_connect('key_press_event', on_press)
+    fig.canvas.mpl_connect('key_press_event', on_press)
+    
     def onsubmit(event):
         #need to have none local (global) as cannot return a value from this function
         #by sharing a variable between functions it will be changed in the on pressfunction
@@ -174,9 +224,12 @@ def GUI(stabilities,extent,generator,plottype="imshow",cmap="terrain",Grid=False
     text_box = TextBox(axbox, "Colour map:", textalignment="center")
     text_box.on_submit(onsubmit)
     text_box.set_val(cmap)  # Trigger `submit` with the initial string.
-    plt.show(block=True)    
+    plt.show(block=True)
+    #canvas.draw()
+    
+    #root.mainloop() 
 
-def DrawNewtonsFractalOpencl(x1,x2,y1,y2,fl,fprimel=None,npoints=1000, maxdepth=200,tol=1e-16):
+def DrawNewtonsFractalOpencl(x1,x2,y1,y2,fl,fprimel=None,npoints=1000, maxdepth=200,tol=1e-16,ShowOrbits=True):
     if isinstance(fl,str):
         fl=parse_expr(fl)
         fp=sp.diff(fl)
@@ -186,23 +239,26 @@ def DrawNewtonsFractalOpencl(x1,x2,y1,y2,fl,fprimel=None,npoints=1000, maxdepth=
         fp=sp.diff(fl)
         fl=sp.lambdify(x,fl)
         fprimel=sp.lambdify(x,fp)
-    innerwrap = PyopenclNewtonsFractal.WrapperOpenCltoDraw(x1,x2,y1,y2,fl,fprimel,npoints=npoints, maxdepth=maxdepth,tol=tol)
+    innerwrap,orbitgen = PyopenclNewtonsFractal.WrapperOpenCltoDraw(x1,x2,y1,y2,fl,fprimel,npoints=npoints, maxdepth=maxdepth,
+                                                                    tol=tol,ShowOrbits=ShowOrbits)
     Roots,extent=innerwrap(x1,x2,y1,y2)
-    GUI(Roots,extent,innerwrap)
+    GUI(Roots,extent,(innerwrap,orbitgen))
     
-def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1024, maxdepth=3000,cycles=16,cycleacc=None,ittcountcolouring=True,Divlim=2,variation=""):
+def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1024, maxdepth=3000,cycles=16,cycleacc=None,ittcountcolouring=True,Divlim=2,variation="",ShowOrbits=True):
     if isinstance(fl,str):
         fl=parse_expr(fl)
         fl=sp.lambdify((x,c),fl)
     if isinstance(fl,sp.Basic):
         fl=sp.lambdify((x,c),fl)
-    print((x1,x2,y1,y2))
-    innerwrap = PyopenclStabilityFractal.WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=npoints, maxdepth=maxdepth,cycles=cycles,
-                                                             cycleacc=cycleacc,ittCountColouring=ittcountcolouring,Divlim=Divlim,variationmode=variation)
+    
+    innerwrap,orbitgen = PyopenclStabilityFractal.WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=npoints, maxdepth=maxdepth,cycles=cycles,
+                                                             cycleacc=cycleacc,ittCountColouring=ittcountcolouring,Divlim=Divlim,
+                                                             variationmode=variation,ShowOrbits=ShowOrbits)
+    
     
     Roots,extent=innerwrap(x1,x2,y1,y2)
     #Roots=np.log(abs(Roots))
-    GUI(Roots,extent,innerwrap)
+    GUI(Roots,extent,(innerwrap,orbitgen))
         
     
 
@@ -222,13 +278,14 @@ of gen and seed, as well as the original image.
 if __name__ == '__main__':
    
     starttime = timeit.default_timer()
-
+    
     res = 2000
     maxdepth = 2048
-    f=x**2+c
-    
-    DrawStabilityFractalOpencl(-2,2,-2,2,f,maxdepth=maxdepth,npoints=res,cycles=10,ittcountcolouring=True)
-    #DrawNewtonsfractalOpencl(-1,1,-1,1,fl,fpl,npoints=res,maxdepth=500,tol=1e-6)
+    f=x**3+1
+    fl=sp.lambdify(x,f)
+    fpl=sp.lambdify(x,sp.diff(f))
+    #DrawStabilityFractalOpencl(-2,2,-2,2,f,maxdepth=maxdepth,npoints=res,cycles=10,ittcountcolouring=True)
+    DrawNewtonsFractalOpencl(-2,2,-2,2,fl,fpl,npoints=res,maxdepth=500,tol=1e-6)
     
     #drawStabilityFractal(npoints=4000,maxdepth=200,ncycles=8)
     #drawnewtontypefractal(f=f,npoints=1000,x1=-1,x2=1,y1=-1,y2=1)

@@ -120,12 +120,24 @@ def NewtonsFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,tol=1e-12,maxdepth
     Ylength=int(np.ceil((SideLength**2)/Xlength))
     return Roots.reshape(Xlength,Ylength),extent
 
-def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,fprimel,npoints=1000, maxdepth=200,tol=1e-16):#this is so spagetified it confuses me as i write it 
+def OrbitAtPixel(x,y,f,fp,tol,N=32):
+    x=complex(x,y)
+    Vals=np.zeros(N).astype(np.complex64)
+    Vals[0]=x
+    for i in range(1,N):
+        Vals[i]=Vals[i-1]-f(Vals[i-1])/fp(Vals[i-1])
+        if abs(Vals[i]-Vals[i-1])<tol:
+            return Vals[:i+1]
+    return Vals
+
+def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,fprimel,npoints=1000, maxdepth=200,tol=1e-16,ShowOrbits=True):#this is so spagetified it confuses me as i write it 
     #god help me if i ever need to look at it again
     mapcl,queue=PrepNewtonsFractalGPU(fl,fprimel)
+    def Orbitwrap(x,y):
+        return OrbitAtPixel(x,y,fl,fprimel,tol)
     def innerwrap(x1,x2,y1,y2):
         return NewtonsFractalPyOpenCL(x1,x2,y1,y2,npoints,mapcl,queue,tol=tol)
-    return innerwrap
+    return innerwrap,Orbitwrap
 
     
 if __name__ == '__main__':#not really intended to be script just here for testing and demo

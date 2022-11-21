@@ -14,6 +14,7 @@ frame.geometry('800x800')
 class mainwindow:
     def StabilityFrac(self):
         options=self.AllOptions["Stability"].copy()
+        
         for i in options.keys():
             try:
                 options[i]=options[i].get()
@@ -98,8 +99,8 @@ class mainwindow:
                     extent=[-2,2,-2,2]
                     Res2=500
                     N2=int(1e6)
-                Gumowski_MiraF = "(k2*x + (2*(1-k2)*x*x/(1.0 + x*x)))"
-                Gumowski_Mirax="k1*y+k3*y*(1-k3*y*y)+"+Gumowski_MiraF
+                Gumowski_MiraF = "(k2 * x + (2*(1-k2)*x*x/(1.0 + x * x )))"
+                Gumowski_Mirax="k1*y+k3* y * (1-k3* y * y )+"+Gumowski_MiraF
                 Gumowski_Miray="-x+"+Gumowski_MiraF.replace("x","XN")
                 AttractorExplorer(*extent,
                                   IttLim,
@@ -118,8 +119,8 @@ class mainwindow:
                         extent=[-2,2,-2,2]
                         Res2=500
                         N2=int(1e6)
-                    hoppalongx = "Y[i]-sign(X[i])*( sqrt(fabs(k2*X[i]-k3)))"
-                    hoppalongy = "k1- X[i]"
+                    hoppalongx = "Y[i]-sign( X[i] )*( sqrt(fabs(k2* X[i] -k3)))"
+                    hoppalongy = "k1- X[i] "
                     AttractorExplorer(*extent,
                                     IttLim,
                                     hoppalongx,
@@ -235,7 +236,7 @@ M.CreateAndLabelSwitch("Use Custom Input","True","Stability")
 M.CreateAndLabelDropdown("Algorithm variations","Standard Mandlebrot like","Stability",["Burning Ship","Tricorn"])
 M.CreateAndLabelDropdown("Use Preselected Function","MandleBrot","Stability",["Reciprocal Mandlebrot","more to be added"])
 M.CreateAndLabelSwitch("Use Preselected Args With Preselected Function","True","Stability")
-M.CreateAndLabelEntry("Extent/Corners in form x1,x2,y1,y2","2,-2,2,-2","Stability")
+M.CreateAndLabelEntry("Extent/Corners in form x1,x2,y1,y2","-2,2,-2,2","Stability")
 M.CreateAndLabelEntry("Seed Function","x**2+c","Stability")
 M.CreateAndLabelEntry("SideLength if square (pixels)",1028,"Stability")
 M.CreateAndLabelEntry("Max Iteration/Depth",2056,"Stability") 
