@@ -135,8 +135,8 @@ def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,fprimel,npoints=1000, maxdepth=200,tol=1e
     mapcl,queue=PrepNewtonsFractalGPU(fl,fprimel)
     def Orbitwrap(x,y):
         return OrbitAtPixel(x,y,fl,fprimel,tol)
-    def innerwrap(x1,x2,y1,y2):
-        return NewtonsFractalPyOpenCL(x1,x2,y1,y2,npoints,mapcl,queue,tol=tol)
+    def innerwrap(x1,x2,y1,y2,maxdepth=maxdepth):
+        return NewtonsFractalPyOpenCL(x1,x2,y1,y2,npoints,mapcl,queue,tol=tol,maxdepth=maxdepth)
     return innerwrap,Orbitwrap
 
     

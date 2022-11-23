@@ -22,9 +22,9 @@ optable = {'+': lambda x, y: x + y,
 
 #must obey order of operations
 operations2arg = ["^","/","*","+"]
-operations2arg=operations2arg[::-1]
-replacements2arg = ["dtype_pow(base,arg)","dtype_divide(base,arg)","dtype_mul(base,arg)","dtype_add(base,arg)"]
-replacements2arg=replacements2arg[::-1]
+#operations2arg=operations2arg[::-1]
+replacements2arg = ["(dtype_#pow#(base,arg))","(dtype_#divide#(base,arg))","(dtype_#mul#(base,arg))","dtype_#add#(base,arg)"]
+#replacements2arg=replacements2arg[::-1]
 #e^(i*x)="dtype_rpow(2.71828182,dtype_mul((dtype_t){0,1},arg))"
 #e^(-i*x)="dtype_rpow(2.71828182,dtype_mul((dtype_t){0,-1},arg))"
 #(e*iz-e^-iz)/2i=dtype_divide((dtype_t){0,2},dtype_add(e^(i*x),dtype_neg(e^(-i*x)))) = sin(x)
@@ -182,15 +182,15 @@ def makesig(pysig,dtype):
         pysig[i]=dtype+" "+pysig[i]
     return pysig
 
-def dtyper(operation):#adds the r in the right place to use correct function call
+def dtyper(args,operation):#adds the r in the right place to use correct function call
     #funcname(real,comp) -->> rfuncname(real,comp)
     #funcname(come,real) -->> funcnamer(come,real)
     #funcname(comp,comp) -->> funcname(comp,comp)
-    lhs=operation.find("_")
-    rhs=operation.find("(")
+    lhs=operation.find("#")
+    rhs=operation.rfind("#")
     regexp = re.compile(r"^\(?(-? ?\d+)(\.\d*)?\)?$")#regex to check for number currently rejects .123 but 0.123 is fine 
     #also allows for brackets around number for example (-1)
-    centralcommaindex=0
+    """centralcommaindex=0
     bracketcount=0
     lowestbracketcomma=9999
     #print(operation)   
@@ -206,7 +206,7 @@ def dtyper(operation):#adds the r in the right place to use correct function cal
             operation[rhs+1:operation.rfind(")")][centralcommaindex+1:])#split whats between first opening bracket and last closing bracket by comma in least brackets
     else:
         args=(operation[rhs+1:operation.find(")")].split(","))
-    #print(f"{operation}split into {args}")
+    print(f"{operation} \n split into \n{args}")"""
     if len(args)==1:
        
        return operation
@@ -218,9 +218,14 @@ def dtyper(operation):#adds the r in the right place to use correct function cal
         #print(operation)
         return operation
     if bool(regexp.search(args[0])):
+        print("base real")
+        print(args[0])
         operation = operation[:lhs+1]+"r"+operation[lhs+1:]
     if bool(regexp.search(args[1])):
-        operation = operation[:rhs]+"r"+operation[rhs:]   
+        print("arg real")
+        print(args[1])
+        operation = operation[:rhs]+"r"+operation[rhs:]
+    operation=operation.replace("#","")   
     return operation
 
 
@@ -252,24 +257,27 @@ def translateRegion(workingfs,operations=operations2arg,replacements2arg=replace
         if  workingfs.count(operations[c])>realoperationcount:
             base,arg = workingfs.split(operations[c],1)
             #ive removed and retyped these prints to many times i wont take them out again
-            """print("\n\n\n")
+            print("\n\n\n")
             print(workingfs)
             print((workingfs.count("("),workingfs.count(")")))
             print("into getargs:")
             print(base)
             print(operations[c])
             print(arg)
-            print((base.count("("),base.count(")")))    """
+            print((base.count("("),base.count(")")))    
             #base=GetArg(base,r=True,diagnosticmode=True)    
             base,arg = getBaseAndArgs(base,arg)
-            """print("extracted args:")
+            print("extracted args:")
             print(base)
             print(arg)
-            print((base.count("("),base.count(")")))"""
+            print((base.count("("),base.count(")")))
+            #assert operations[c]!="+"
             if not(bool(regexp.search(arg)) and bool(regexp.search(base))):#only replace if atleast 1 arg is complex type
-                replacement=replacements2arg[c].replace("dtype_",dtype).replace("base",base.strip()).replace("arg",arg.strip())
+                replacement=dtyper((base,arg),replacements2arg[c])
+                
+                replacement=replacement.replace("dtype_",dtype).replace("base",base.strip()).replace("arg",arg.strip())
                 #print(f"replacing {base+operations[c]+arg} with {replacement}")
-                replacement=dtyper(replacement) 
+                 
             else:
                 realoperationcount+=1
                 
@@ -415,7 +423,7 @@ if __name__ == '__main__':#for testing not really intedned to be ran
     #f=(sp.exp(1j*x)+sp.exp(-1j*x))*0.5
     #f=sp.exp(x)
     #f=(sp.exp(1j*x)+sp.exp(-1j*x))*0.5
-    f=sp.cos(x)*sp.sin(x)**2
+    f=sp.cos(x)**2 + sp.sin(x)**2
     fl=sp.lambdify(x,f)
     print(inspect.getsource(fl))
     flt=translate(fl)

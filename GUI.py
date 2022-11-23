@@ -1,20 +1,16 @@
 import tkinter as tk 
 from tkinter import *
 from tkinter import ttk
-from Main import DrawStabilityFractalOpencl,DrawNewtonsFractalOpencl
+from FrontEnd import DrawStabilityFractalOpencl,DrawNewtonsFractalOpencl,DrawJuliaFractalOpencl,Draw2axisJuliaStabilityFractalOpencl
 from pyopenclAttractorFractals import AttractorExplorer
 import numpy as np
 # Top level window
 frame = tk.Tk()
 frame.title("TextBox Input")
-frame.geometry('800x800')
-# Function for getting Input
-# from textbox and printing it SGDSD
-# at label widget
+frame.geometry('1400x800')
+
 class mainwindow:
-    def StabilityFrac(self):
-        options=self.AllOptions["Stability"].copy()
-        
+    def getOptionsStability(self,options):
         for i in options.keys():
             try:
                 options[i]=options[i].get()
@@ -23,10 +19,8 @@ class mainwindow:
         if not (options['Cycle Detection'].lower() in ["false","n","no","0"]):
             cycles=10
         else:
-            cycles=0
-         
-        Seedfunc=options["Seed Function"].lower()
-         
+            cycles=0         
+        Seedfunc=options["Seed Function"].lower()         
         if options["Tolerance for cycle Detection"].lower() != "auto": 
             try:
                 cycleacc=float(options["Tolerance for cycle Detection"])
@@ -50,7 +44,13 @@ class mainwindow:
             if options["Use Preselected Function"]=="Reciprocal Mandlebrot":
                 Seedfunc="1/(x**2+c)"
                 if options["Use Preselected Args With Preselected Function"]=="True":
-                    extent=[1,-0.5,1,-0.5]    
+                    extent=[1,-0.5,1,-0.5]
+        #x1,x2,y1,y2,fl,npoints=1024, maxdepth=3000,cycles=16,cycleacc=None,ittcountcolouring=True,Divlim=2,variation="",ShowOrbits=True
+        return(extent,Seedfunc,variation,cycleacc,ittcountcolouring,cycles,options)
+    def StabilityFrac(self,julia=False):
+        
+        options=self.AllOptions["Stability"].copy()
+        extent,Seedfunc,variation,cycleacc,ittcountcolouring,cycles,options=self.getOptionsStability(options)
         DrawStabilityFractalOpencl(*extent,
                                    Seedfunc,
                                    maxdepth=int(options['Max Iteration/Depth']),
@@ -58,8 +58,36 @@ class mainwindow:
                                    ittcountcolouring =ittcountcolouring,
                                    npoints=int(options["SideLength if square (pixels)"]),
                                    cycleacc=cycleacc,
-                                   Divlim=float(options["Divergence Limit"]),variation=variation)
-        
+                                   Divlim=float(options["Divergence Limit"]),
+                                   variation=variation)
+    def JuliaFrac(self):
+        options=self.AllOptions["Julia"].copy()
+        extent,Seedfunc,variation,cycleacc,ittcountcolouring,cycles,options=self.getOptionsStability(options)
+        C=options["Complex Seed Constant"].replace(" ","")
+        C=complex(C)
+        if options["Plot Corresponding Stability fractal\n and Use to Explore Different Seed Constants"]:
+            Draw2axisJuliaStabilityFractalOpencl(*extent,
+                                                C,
+                                                Seedfunc,
+                                                maxdepth=int(options['Max Iteration/Depth']),
+                                                cycles=cycles,
+                                                ittcountcolouring =ittcountcolouring,
+                                                npoints=int(options["SideLength if square (pixels)"]),
+                                                cycleacc=cycleacc,
+                                                Divlim=float(options["Divergence Limit"]),
+                                                variation=variation)
+        else:
+            DrawJuliaFractalOpencl(*extent,
+                                    C,
+                                    Seedfunc,
+                                    maxdepth=int(options['Max Iteration/Depth']),
+                                    cycles=cycles,
+                                    ittcountcolouring =ittcountcolouring,
+                                    npoints=int(options["SideLength if square (pixels)"]),
+                                    cycleacc=cycleacc,
+                                    Divlim=float(options["Divergence Limit"]),
+                                    variation=variation)
+          
     def NewtonsFrac(self):
         options=self.AllOptions["Newtons"].copy()
         for i in options.keys():
@@ -204,20 +232,26 @@ class mainwindow:
         self.panedwindow=ttk.Panedwindow(frame, orient=HORIZONTAL)  
         self.panedwindow.pack(fill=BOTH, expand=True)  
         #Create Frames  
-        self.StabilityFracframe=ttk.Frame(self.panedwindow,width=400,height=400, relief=SUNKEN)  
+        self.StabilityFracframe=ttk.Frame(self.panedwindow,width=400,height=400, relief=SUNKEN)
+        self.JuliaFracframe=ttk.Frame(self.panedwindow,width=400,height=400, relief=SUNKEN)  
         self.NewtonsFracframe=ttk.Frame(self.panedwindow,width=400,height=400, relief=SUNKEN)
         self.AttractorFracframe=ttk.Frame(self.panedwindow,width=400,height=400, relief=SUNKEN)  
-        self.panedwindow.add(self.StabilityFracframe, weight=1)  
+        self.panedwindow.add(self.StabilityFracframe, weight=1)
+        self.panedwindow.add(self.JuliaFracframe, weight=1)  
         self.panedwindow.add(self.NewtonsFracframe, weight=1) 
         self.panedwindow.add(self.AttractorFracframe, weight=1)
-        self.frames={"Stability":self.StabilityFracframe,"Newtons":self.NewtonsFracframe,"Attractor":self.AttractorFracframe}
+        self.frames={"Stability":self.StabilityFracframe,"Julia":self.JuliaFracframe,"Newtons":self.NewtonsFracframe,"Attractor":self.AttractorFracframe}
         
-        self.AllOptions={"Stability":{},"Newtons":{},"Attractor":{}}
+        self.AllOptions={"Stability":{},"Julia":{},"Newtons":{},"Attractor":{}}
         
         # Button Creation
         StabilityFracButton = ttk.Button(self.StabilityFracframe,
                                 text = "Stability Fractal", 
                                 command = self.StabilityFrac)
+        
+        JuliaFracButton = ttk.Button(self.JuliaFracframe,
+                                text = "Julia Fractal", 
+                                command = self.JuliaFrac)
 
         NewtonsFracButton = ttk.Button(self.NewtonsFracframe,
                                 text = "Newtons Fractal", 
@@ -226,7 +260,8 @@ class mainwindow:
         AttractorFracButton = ttk.Button(self.AttractorFracframe,
                                 text = "Attractor Fractal", 
                                 command = self.AttractorFrac)
-        StabilityFracButton.grid(row=0,column=0,padx=2)
+        StabilityFracButton.grid(row=0,column=0,padx=0,pady=0)
+        JuliaFracButton.grid(row=0,column=0,padx=0,pady=0)
         NewtonsFracButton.grid(row=0,column=0,padx=2)
         AttractorFracButton.grid(row=0,column=0,padx=2)  
         
@@ -245,6 +280,20 @@ M.CreateAndLabelEntry("Colour from Iteration Count",True,"Stability")
 M.CreateAndLabelEntry("Tolerance for cycle Detection","Auto","Stability")
 M.CreateAndLabelEntry("Divergence Limit","2","Stability")
 
+M.CreateAndLabelSwitch("Plot Corresponding Stability fractal\n and Use to Explore Different Seed Constants","True","Julia")
+M.CreateAndLabelSwitch("Use Custom Input","True","Julia")
+M.CreateAndLabelDropdown("Algorithm variations","Standard Mandlebrot like","Julia",["Burning Ship","Tricorn"])
+M.CreateAndLabelDropdown("Use Preselected Function","MandleBrot","Julia",["Reciprocal Mandlebrot","more to be added"])
+M.CreateAndLabelSwitch("Use Preselected Args With Preselected Function","True","Julia")
+M.CreateAndLabelEntry("Extent/Corners in form x1,x2,y1,y2","-2,2,-2,2","Julia")
+M.CreateAndLabelEntry("Complex Seed Constant","-0.4+0.6j","Julia")
+M.CreateAndLabelEntry("Seed Function","x**2+c","Julia")
+M.CreateAndLabelEntry("SideLength if square (pixels)",1028,"Julia")
+M.CreateAndLabelEntry("Max Iteration/Depth",2056,"Julia") 
+M.CreateAndLabelEntry("Cycle Detection",True,"Julia")
+M.CreateAndLabelEntry("Colour from Iteration Count",True,"Julia")
+M.CreateAndLabelEntry("Tolerance for cycle Detection","Auto","Julia")
+M.CreateAndLabelEntry("Divergence Limit","2","Julia")
 
 M.CreateAndLabelSwitch("Use Custom Input","True","Newtons")
 M.CreateAndLabelDropdown("Use Preselected Function","X**3+1","Newtons",["Exponential","more to be added"])

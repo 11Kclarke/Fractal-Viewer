@@ -18,23 +18,25 @@ Tricornpvariation="Xn=dtype_conj(Xn);"
 StabilityFractalNoCycle="""
     int n = 0;
     dtype_t Const=X[i];//dont rename
-    bool notfound = true;
-    while (dtype_abs(X[i])<DivLim && n<N) 
+    dtype_t Xn=X[i];
+    while (dtype_abs_squared(Xn)<DivLim && n<N) 
     {
-        Xn =__variation_mode__;
+        __variation_mode__;
         n+=1;
-        X[i]=__f(X[i],Const)__;
+        Xn=__f(Xn,Const)__;
     }
-    X[i].real=__colouring_mode__;
+    __colouring_mode__;
     """
 #Gospers algorithm used as cycle detection.
 #implementation of gospers algorithm modified from hackers delight. 
 StabilityFractalWithCycle="""
 short k,kmax,m,n;
 dtype_t T[maxCyclelog2+1];
-dtype_t Xn=X[i];//should prolly be 0
-dtype_t Const = Xn;
-T[0] = Xn;
+//dtype_t Xn=X[i];//should prolly be 0
+//X[i]= dtype_rmul(0.5,X[i]);
+dtype_t Xn=(dtype_t){0.0,0.0};
+__JuliaOrMandlebrotlike__
+T[0] = X[i];
 for (n = 1; n<N; n++) {
     __variation_mode__;
     Xn =__f(Xn,Const)__;
@@ -56,13 +58,14 @@ for (n = 1; n<N; n++) {
     """
 
 """Fl seed func, cycles false or 0 for no cycle detection int for number of cycles"""
-def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=False,variation=""):
+def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=False,variation="",juliaMode=False):
     if isinstance(fl,str):
         fl=sp.lambdify(x,fl)
     flt=PyToPyOpenCL.translate(fl)
     cl.tools.get_or_register_dtype(dtype+"t", np.complex128)
     if cycles==False or cycles==0:#not sure about behaviour of not cycles when cycles not a bool
-        Code=StabilityFractalNoCycle    
+        Code=StabilityFractalNoCycle
+        print(Code)    
     elif  isinstance(cycles,int):
         Code=StabilityFractalWithCycle
     if ittCountColouring:   
@@ -71,16 +74,22 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
         Code= Code.replace("__colouring_mode__;","X[i].real = Xn.real;")#Comments the code for colouring by ittcount   
     if isinstance(cycles,str):
         Code=cycles
-    
     Code= Code.replace("__variation_mode__;",variation)
-    
-    mapclstr = PyToPyOpenCL.subsfunction(flt,Code,"f")
-                                                                                                           
-    mapclstr=mapclstr.replace("dtype_",dtype)
+    print(Code)
+    mapclstr = PyToPyOpenCL.subsfunction(flt,Code,"f")                                                                                                      
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
+    AlwaysArgs=dtype+"t"+" *X,int N,double DivLim"#arguments that will be in every version
+    if juliaMode: 
+        AlwaysArgs=dtype+"t"+" Const, "+ AlwaysArgs#only required for julia sets
+        mapclstr=mapclstr.replace("__JuliaOrMandlebrotlike__","")
+        #print(mapclstr)
+    else:
+        mapclstr=mapclstr.replace("__JuliaOrMandlebrotlike__","dtype_t Const = X[i];")
+    mapclstr=mapclstr.replace("dtype_",dtype)  
+    print("using dtype: ")  
     if cycles==False or cycles==0:
-        return ElementwiseKernel(ctx,dtype+"t"+" *X,int N,double DivLim",mapclstr,"StabilityFractal",preamble="#define PYOPENCL_DEFINE_CDOUBLE //#include <pyopencl-complex.h>  "),queue
+        return ElementwiseKernel(ctx,AlwaysArgs,mapclstr,"StabilityFractal",preamble="#define PYOPENCL_DEFINE_CDOUBLE //#include <pyopencl-complex.h>  "),queue
     else:
         preamble="""
         #define PYOPENCL_DEFINE_CDOUBLE 
@@ -89,21 +98,10 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
         
         __constant int maxCyclelog2 = """+str(cycles)+"""; // should be set to 32 nearly always
         """
-        return ElementwiseKernel(ctx,dtype+"t"+" *X,int N,double DivLim,double cycleacc",mapclstr,"StabilityFractal",preamble=preamble),queue
+        return ElementwiseKernel(ctx,AlwaysArgs + ",double cycleacc",mapclstr,"StabilityFractal",preamble=preamble),queue
 
 
-#@njit   
-def OrbitAtPixel(x,y,f,N=8,Divlim=2,variation=None):
-    x=complex(x,y)
-    Vals=np.zeros(N).astype(np.complex64)
-    Vals[0]=f(Vals[1],x)
-    for i in range(1,N):
-        Vals[i-1]=variation(Vals[i-1])
-        Vals[i]=f(Vals[i-1],x)
-        if abs(Vals[i])>Divlim:
-            return Vals[:i+1]
-    return Vals
-        
+
     
 
 def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,DivLim=2.0,maxdepth=30,cycles=32,cycleacc=None,shuffle=False):
@@ -137,16 +135,65 @@ def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,DivLim=2.0,maxde
     #print(np.max(Stabilities))
     return Stabilities.reshape(Xlength,Ylength),extent
 
-def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype="cdouble_",
-                        Code=StabilityFractalNoCycle,cycles=False,cycleacc=1e-5,ittCountColouring=True,
-                        variationmode="",ShowOrbits=True):
+def JuliaFractalPyOpenCL(x1,x2,y1,y2,C,SideLength,mapcl,queue,DivLim=2.0,maxdepth=30,cycles=32,cycleacc=None):
+    DivLim=DivLim**2
+    extent = [x1,x2,y1,y2]
+    #print(f"{extent} from inside fractgen")
+    Stabilities,shape=createstartvals(x1,x2,y1,y2,SideLength)
+    Xlength,Ylength=shape
+    
+    Stabilities=cl.array.to_device(queue,Stabilities)
+    if cycles==False or int(cycles) == 0:#not sure about behaviour of not cycles when cycles not a bool
+        mapcl(C,Stabilities,maxdepth,np.float64(DivLim))
+    else:
+        if cycleacc == None:
+            cycleacc=((x1-x2)**2+(y1-y2)**2)/(Xlength**2+Ylength**2)#removed sqrt
+            #default threshold  diagonal length of 1 pixel 
+            #print(f"cycle tolerance auto calced as {cycleacc}")
+        print((C,Stabilities,maxdepth,np.float64(DivLim),np.float64(cycleacc)))
+        mapcl(C,Stabilities,maxdepth,np.float64(DivLim),np.float64(cycleacc))
+        
+    Stabilities=np.real(Stabilities.get())
+    #print(np.min(Stabilities))
+    #print(np.max(Stabilities))
+    return Stabilities.reshape(Xlength,Ylength),extent
+
+#@njit   
+def OrbitAtPixel(x,y,f,N=8,Divlim=2,variation=None):
+    x=complex(x,y)
+    
+    Vals=np.zeros(N).astype(np.complex64)
+    Vals[0]=x
+    Vals[1]=f(Vals[0],x)
+    for i in range(2,N):
+        Vals[i-1]=variation(Vals[i-1])
+        Vals[i]=f(Vals[i-1],x)
+        if abs(Vals[i])>Divlim:
+            return Vals[:i+1]
+    return Vals
+        
+def JuliaOrbitAtPixel(x,y,c,f,N=8,Divlim=2,variation=None):
+    x=complex(x,y)
+    
+    Vals=np.zeros(N).astype(np.complex64)
+    Vals[0]=x
+    Vals[1]=f(Vals[0],c)
+    for i in range(2,N):
+        Vals[i-1]=variation(Vals[i-1])
+        Vals[i]=f(Vals[i-1],c)
+        if abs(Vals[i])>Divlim:
+            return Vals[:i+1]
+    return Vals
+
+def applyvariation(variationmode,fl,Divlim):
+    
     fljit=njit(fl,fastmath=True)
     if variationmode == "Burning Ship":
         variationmode=Burningshipvariation
         def Burningship(X):
             return complex(abs(X.real),abs(X.imag))
         def Orbitinnerwrap(x,y):
-            return OrbitAtPixel(x,y,fljit,Divlim=Divlim,Divlimvariation=Burningship)
+            return OrbitAtPixel(x,y,fljit,Divlim=Divlim,variation=Burningship)
     elif variationmode == "Tricorn":
         variationmode=Tricornpvariation
         def Tricorn(X):
@@ -154,23 +201,132 @@ def WrapperOpenCltoDraw(x1,x2,y1,y2,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype
         def Orbitinnerwrap(x,y):
             return OrbitAtPixel(x,y,fljit,Divlim=Divlim,variation=Tricorn)
     else:
-
         def identity(X):
             return X
         def Orbitinnerwrap(x,y):
             return OrbitAtPixel(x,y,fljit,Divlim=Divlim,variation=identity)
+    return Orbitinnerwrap,variationmode
+
+def Juliaapplyvariation(variationmode,fl,Divlim):
+    print(variationmode)
+    fljit=njit(fl,fastmath=True)
+    if variationmode == "Burning Ship":
+        variationmode=Burningshipvariation
+        def Burningship(X):
+            return complex(abs(X.real),abs(X.imag))
+        def Orbitinnerwrap(x,y,c):
+            return JuliaOrbitAtPixel(x,y,c,fljit,Divlim=Divlim,variation=Burningship)
+    elif variationmode == "Tricorn":
+        variationmode=Tricornpvariation
+        def Tricorn(X):
+            return np.conj(X)
+        def Orbitinnerwrap(x,y,c):
+            return JuliaOrbitAtPixel(x,y,c,fljit,Divlim=Divlim,variation=Tricorn)
+    else:
+        def identity(X):
+            return X
+        def Orbitinnerwrap(x,y,c):
+            return JuliaOrbitAtPixel(x,y,c,fljit,Divlim=Divlim,variation=identity)
+    return Orbitinnerwrap,variationmode
+
+def WrapperStabilityFractalOpenCltoDraw(x1,x2,y1,y2,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype="cdouble_",
+                        Code=StabilityFractalNoCycle,cycles=False,cycleacc=1e-5,ittCountColouring=True,
+                        variationmode="",ShowOrbits=True):
+    Orbitinnerwrap,variationmode=applyvariation(variationmode,fl,Divlim)
     openclfunc,queue= PrepStabilityFractalGPU(fl,dtype=dtype,cycles=cycles,ittCountColouring=ittCountColouring,variation=variationmode)
-    def innerwrap(x1,x2,y1,y2):
+    def innerwrap(x1,x2,y1,y2,maxdepth=maxdepth):
         return StabilityFractalPyOpenCL(x1,x2,y1,y2,npoints,openclfunc,queue,DivLim=Divlim,maxdepth=maxdepth,cycles=cycles,cycleacc=cycleacc)
-    
-    
+    return innerwrap,Orbitinnerwrap
+
+def WrapperJuliaFractalOpenCltoDraw(x1,x2,y1,y2,C,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype="cdouble_",
+                        Code=StabilityFractalNoCycle,cycles=False,cycleacc=1e-5,ittCountColouring=True,
+                        variationmode="",ShowOrbits=True):
+    Orbitinnerwrap,variationmode=Juliaapplyvariation(variationmode,fl,Divlim)
+    openclfunc,queue= PrepStabilityFractalGPU(fl,dtype=dtype,cycles=cycles,ittCountColouring=ittCountColouring,variation=variationmode,juliaMode=True)
+    def innerwrap(x1,x2,y1,y2,C,maxdepth=maxdepth):
+        return JuliaFractalPyOpenCL(x1,x2,y1,y2,C,npoints,openclfunc,queue,DivLim=Divlim,maxdepth=maxdepth,cycles=cycles,cycleacc=cycleacc)
     return innerwrap,Orbitinnerwrap
 
 if __name__ == '__main__':#not really intended to be script just here for testing and demo
     x,c=sp.symbols("x,c")
     f=x**2+c
     fl=sp.lambdify((x,c),f)
-
+    mapcl,queueorig=PrepStabilityFractalGPU(fl,cycles=0,ittCountColouring=True)
+    queue=queueorig
+    D=2
+    #Roots1,extent=StabilityFractalPyOpenCL(-2,2,-2,2,1000,mapcl,queue,maxdepth=D,cycles=16)
+    #fig,axs=plt.subplots(3)
+    extent=np.array([-2,2,-2,2])
+    """Roots1pre,notextent=StabilityFractalPyOpenCL(*(np.array(extent)),500,mapcl,queue,maxdepth=2000,cycles=0)
+    axs[0].imshow(Roots1pre)
+    Roots2pre,notextent=StabilityFractalPyOpenCL(*(np.array(extent)),500,mapcl,queue,maxdepth=2002,cycles=0)
+    axs[1].imshow(Roots2pre)
+    print(np.sum(np.abs(Roots1pre-Roots2pre)))
+    axs[2].imshow(np.abs(Roots1pre-Roots2pre))
+    plt.show()"""
+    diffs=[]
+    depths=[]
+    diffs2=[]
+    diffs3=[]
+    diffs4=[]
+    
+    
+    Roots1pre,notextent=StabilityFractalPyOpenCL(*(np.array(extent)),800,mapcl,queue,maxdepth=D,cycles=0)
+        
+    Roots2pre,notextent=StabilityFractalPyOpenCL(*(np.array(extent)*(1/2)),800,mapcl,queue,maxdepth=D,cycles=0)
+        
+    Roots3pre,notextent=StabilityFractalPyOpenCL(*(np.array(extent)*(1/4)),800,mapcl,queue,maxdepth=D,cycles=0)
+        
+    #Roots4pre,notextent=StabilityFractalPyOpenCL(*(np.array(extent)*(1/8)),800,mapcl,queue,maxdepth=D,cycles=0)
+    for i in range(1,40):
+        Roots1,notextent=StabilityFractalPyOpenCL(*(np.array(extent)),800,mapcl,queue,maxdepth=D+1*i,cycles=0)
+        
+        Roots2,notextent=StabilityFractalPyOpenCL(*(np.array(extent)*(1/2)),800,mapcl,queue,maxdepth=D+1*i,cycles=0)
+        
+        Roots3,notextent=StabilityFractalPyOpenCL(*(np.array(extent)*(1/4)),800,mapcl,queue,maxdepth=D+1*i,cycles=0)
+        
+        #Roots4,notextent=StabilityFractalPyOpenCL(*(np.array(extent)*(1/8)),800,mapcl,queue,maxdepth=D+1*i,cycles=0)
+        
+        diffs.append(np.sum(Roots1-Roots1pre))
+        depths.append(D+1*i)
+        diffs2.append(np.sum(Roots2-Roots2pre))
+        diffs3.append(np.sum(Roots3-Roots3pre))
+        #diffs4.append(np.sum(Roots4-Roots4pre))
+        Roots1pre=Roots1
+        Roots2pre=Roots2
+        Roots3pre=Roots3
+        if len(diffs)>=4:
+            if diffs[i-2]-diffs[i-3]==diffs[i-1]-diffs[i-2]:
+                print("1")
+                print(i)
+            if diffs2[i-2]-diffs2[i-3]==diffs2[i-1]-diffs2[i-2]:
+                print("2")
+                print(i)
+            if diffs3[i-2]-diffs3[i-3]==diffs3[i-1]-diffs3[i-2]:
+                print("3")
+                print(i)
+                
+        #Roots4pre=Roots4
+    fig,axs=plt.subplots(3)
+    axs[0].plot(depths,np.abs(diffs))
+    axs[1].plot(np.log(depths),np.log(np.abs(diffs)))
+    axs[2].plot(depths,diffs)
+    axs[0].plot(depths,np.abs(diffs2))
+    axs[1].plot(np.log(depths),np.log(np.abs(diffs2)))
+    axs[2].plot(depths,diffs2)
+    axs[0].plot(depths,np.abs(diffs3))
+    axs[1].plot(np.log(depths),np.log(np.abs(diffs3)))
+    axs[2].plot(depths,diffs3)
+    
+    print(diffs)
+  
+    plt.show()
+    """max=totaltime=0
+    for i in range(k):
+        starttime = timeit.default_timer()
+        Roots,extent=StabilityFractalPyOpenCL(-2,2,-2,2,1000,mapcl,queue,maxdepth=2000,cycles=16)
+        totaltime+=(timeit.default_timer()-starttime)
+        if (timeit.default_timer()-starttime)>max:max=(timeit.default_timer()-starttime)"""
 
 """
     mapcl,queueorig=PrepStabilityFractalGPU(fl,cycles=16,ittCountColouring=True)
