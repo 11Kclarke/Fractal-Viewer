@@ -7,16 +7,17 @@ import matplotlib.pyplot as plt
 import sympy as sp
 import timeit
 import PyToPyOpenCL#mine
-from PyopenclNewtonsFractal import createstartvals#mine
+from Utils import createstartvals#mine
 from numba import njit
 os.environ["PYOPENCL_CTX"]="0"
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
-
+x,c,y,a,b,d=sp.symbols("x,c,y,a,b,d")
 Burningshipvariation="Xn=(dtype_t){fabs(Xn.real),fabs(Xn.imag)};"
 Tricornpvariation="Xn=dtype_conj(Xn);"
 
 StabilityFractalNoCycle="""
     int n = 0;
+    
     dtype_t Const=X[i];//dont rename
     dtype_t Xn=X[i];
     while (dtype_abs_squared(Xn)<DivLim && n<N) 
@@ -32,14 +33,17 @@ StabilityFractalNoCycle="""
 StabilityFractalWithCycle="""
 short k,kmax,m,n;
 dtype_t T[maxCyclelog2+1];
-//dtype_t Xn=X[i];//should prolly be 0
+
+
 //X[i]= dtype_rmul(0.5,X[i]);
-dtype_t Xn=(dtype_t){0.0,0.0};
+dtype_t Xn=X[i];//breaks julia if set to 0
 __JuliaOrMandlebrotlike__
 T[0] = X[i];
 for (n = 1; n<N; n++) {
     __variation_mode__;
-    Xn =__f(Xn,Const)__;
+    Xn =__f(Xn,Const,ExtraPrecisionVars[])__;
+    ExtraPrecisionVars[0].imag=0;
+    ExtraPrecisionVars[0].real=0;
     kmax = maxCyclelog2-1 - clz(n); // Floor(log2 n).
     for (k = 0; k <= kmax; k++) {
         if (dtype_abs_squared(dtype_add(Xn,dtype_neg(T[k])))<cycleacc){
@@ -58,14 +62,13 @@ for (n = 1; n<N; n++) {
     """
 
 """Fl seed func, cycles false or 0 for no cycle detection int for number of cycles"""
-def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=False,variation="",juliaMode=False):
-    if isinstance(fl,str):
-        fl=sp.lambdify(x,fl)
-    flt=PyToPyOpenCL.translate(fl)
+def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=False,variation="",juliaMode=False,ExtraPrecisionVars=1):
+    
+    flt=PyToPyOpenCL.translate(fl,extraPrecisionArgs=ExtraPrecisionVars)
     cl.tools.get_or_register_dtype(dtype+"t", np.complex128)
     if cycles==False or cycles==0:#not sure about behaviour of not cycles when cycles not a bool
         Code=StabilityFractalNoCycle
-        print(Code)    
+          
     elif  isinstance(cycles,int):
         Code=StabilityFractalWithCycle
     if ittCountColouring:   
@@ -75,8 +78,9 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
     if isinstance(cycles,str):
         Code=cycles
     Code= Code.replace("__variation_mode__;",variation)
+    print(flt)
     print(Code)
-    mapclstr = PyToPyOpenCL.subsfunction(flt,Code,"f")                                                                                                      
+    mapclstr = PyToPyOpenCL.subsfunction(flt,Code,"f",sig=["x ","c","extrprecision"])                                                                                                      
     ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
     AlwaysArgs=dtype+"t"+" *X,int N,double DivLim"#arguments that will be in every version
@@ -86,10 +90,18 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
         #print(mapclstr)
     else:
         mapclstr=mapclstr.replace("__JuliaOrMandlebrotlike__","dtype_t Const = X[i];")
+        print("Julia")
+    print(ExtraPrecisionVars)
+    if ExtraPrecisionVars>0:
+        AlwaysArgs+=", "+dtype+"t"+" *ExtraPrecisionVars"
+        ExtraPrecisionVars=np.array([complex(0,0)]*ExtraPrecisionVars)
+    else:
+        ExtraPrecisionVars=[]
     mapclstr=mapclstr.replace("dtype_",dtype)  
-    print("using dtype: ")  
+    print("using dtype: ")
+    print(mapclstr)  
     if cycles==False or cycles==0:
-        return ElementwiseKernel(ctx,AlwaysArgs,mapclstr,"StabilityFractal",preamble="#define PYOPENCL_DEFINE_CDOUBLE //#include <pyopencl-complex.h>  "),queue
+        return ElementwiseKernel(ctx,AlwaysArgs,mapclstr,"StabilityFractal",preamble="#define PYOPENCL_DEFINE_CDOUBLE //#include <pyopencl-complex.h>  "),queue,ExtraPrecisionVars
     else:
         preamble="""
         #define PYOPENCL_DEFINE_CDOUBLE 
@@ -98,18 +110,42 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
         
         __constant int maxCyclelog2 = """+str(cycles)+"""; // should be set to 32 nearly always
         """
-        return ElementwiseKernel(ctx,AlwaysArgs + ",double cycleacc",mapclstr,"StabilityFractal",preamble=preamble),queue
+        return ElementwiseKernel(ctx,AlwaysArgs + ",double cycleacc",mapclstr,"StabilityFractal",preamble=preamble),queue,ExtraPrecisionVars
 
 
 
     
 
-def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,DivLim=2.0,maxdepth=30,cycles=32,cycleacc=None,shuffle=False):
+def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,DivLim=2.0,maxdepth=30,cycles=32,cycleacc=None,shuffle=False,ExtraPrecisionVars=[]):
     DivLim=DivLim**2
-    extent = [x1,x2,y1,y2]
-    #print(f"{extent} from inside fractgen")
-    Stabilities,shape=createstartvals(x1,x2,y1,y2,SideLength)
+    
+    extent = np.array([x1,x2,y1,y2])#/Magnification
+    print(f"{(x1,x2,y1,y2,SideLength,ExtraPrecisionVars)} from inside fractgen")
+    
+    
+    #(-8.408787292193748e-05, 0.00012886983708417865, -1.4264086909136664, -1.4261653106736594)
+    Stabilities,shape,ExtraPrecisionVars,extent=createstartvals(x1,x2,y1,y2,
+                                                         SideLength,
+                                                         ExtraPrecisionVars=ExtraPrecisionVars)
+    print("fractgen after create startvals")
+    
+    
+    #extent=np.array([min(Stabilities.imag),max(Stabilities.imag),min(Stabilities.real),max(Stabilities.real)])
+    print(extent)
+    x1,x2,y1,y2=extent
+    print(f"{(x1,x2,y1,y2,SideLength,ExtraPrecisionVars)} from inside fractgen")
+    print(x1+ExtraPrecisionVars[0].real,x2+ExtraPrecisionVars[0].real,y1+ExtraPrecisionVars[0].imag,y2+ExtraPrecisionVars[0].imag)
+    print(extent)
+    
+    for i in range(1,len(Stabilities)):
+        if Stabilities[i]==Stabilities[i-1]:
+            print(f"XWidth = {x2-x1}")
+            print(f"YWidth = {y2-y1}")
+            print(extent)
+            
+            assert False
     Xlength,Ylength=shape
+    #if Stabilities[1]-Stabilities[0]<1e-13:
     
     if shuffle:
         orderTemplate = np.arange(SideLength**2)
@@ -117,6 +153,8 @@ def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,DivLim=2.0,maxde
         np.random.shuffle(shuf_order)
         Stabilities=Stabilities[shuf_order]   
     Stabilities=cl.array.to_device(queue,Stabilities)
+    ExtraPrecisionVarsin=np.array([complex(ExtraPrecisionVars[0].real,ExtraPrecisionVars[0].imag)])
+    ExtraPrecisionVarsin=cl.array.to_device(queue,ExtraPrecisionVarsin)
     if cycles==False or int(cycles) == 0:#not sure about behaviour of not cycles when cycles not a bool
         mapcl(Stabilities,maxdepth,np.float64(DivLim))
     else:
@@ -124,16 +162,27 @@ def StabilityFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,DivLim=2.0,maxde
             cycleacc=((x1-x2)**2+(y1-y2)**2)/(Xlength**2+Ylength**2)#removed sqrt
             #default threshold  diagonal length of 1 pixel 
             #print(f"cycle tolerance auto calced as {cycleacc}")
-        mapcl(Stabilities,maxdepth,np.float64(DivLim),np.float64(cycleacc))
+        
+        #ExtraPrecisionVarsin=ExtraPrecisionVars.conjugate()
+        print(ExtraPrecisionVarsin)
+        mapcl(Stabilities,maxdepth,np.float64(DivLim),ExtraPrecisionVarsin,np.float64(cycleacc))
         
     Stabilities=np.real(Stabilities.get())
+    #ExtraPrecisionVars=ExtraPrecisionVars.get()
     if shuffle:
         unshuf_order = np.zeros_like(orderTemplate)
         unshuf_order[shuf_order] = np.arange(SideLength**2)  
         Stabilities=Stabilities[unshuf_order]
     #print(np.min(Stabilities))
     #print(np.max(Stabilities))
-    return Stabilities.reshape(Xlength,Ylength),extent
+    if abs(ExtraPrecisionVars[0])!=0:
+                plt.imshow(Stabilities.reshape(Xlength,Ylength))
+                plt.show(block=True)
+    print(type(extent[0]))
+    print(type(extent))
+    print("just before leaving fractgen")
+    print(extent)
+    return Stabilities.reshape(Xlength,Ylength),(extent,ExtraPrecisionVars)
 
 def JuliaFractalPyOpenCL(x1,x2,y1,y2,C,SideLength,mapcl,queue,DivLim=2.0,maxdepth=30,cycles=32,cycleacc=None):
     DivLim=DivLim**2
@@ -144,6 +193,7 @@ def JuliaFractalPyOpenCL(x1,x2,y1,y2,C,SideLength,mapcl,queue,DivLim=2.0,maxdept
     
     Stabilities=cl.array.to_device(queue,Stabilities)
     if cycles==False or int(cycles) == 0:#not sure about behaviour of not cycles when cycles not a bool
+        
         mapcl(C,Stabilities,maxdepth,np.float64(DivLim))
     else:
         if cycleacc == None:
@@ -151,8 +201,9 @@ def JuliaFractalPyOpenCL(x1,x2,y1,y2,C,SideLength,mapcl,queue,DivLim=2.0,maxdept
             #default threshold  diagonal length of 1 pixel 
             #print(f"cycle tolerance auto calced as {cycleacc}")
         print((C,Stabilities,maxdepth,np.float64(DivLim),np.float64(cycleacc)))
-        mapcl(C,Stabilities,maxdepth,np.float64(DivLim),np.float64(cycleacc))
         
+        mapcl(C,Stabilities,maxdepth,np.float64(DivLim),np.float64(cycleacc))
+       
     Stabilities=np.real(Stabilities.get())
     #print(np.min(Stabilities))
     #print(np.max(Stabilities))
@@ -231,18 +282,28 @@ def Juliaapplyvariation(variationmode,fl,Divlim):
 
 def WrapperStabilityFractalOpenCltoDraw(x1,x2,y1,y2,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype="cdouble_",
                         Code=StabilityFractalNoCycle,cycles=False,cycleacc=1e-5,ittCountColouring=True,
-                        variationmode="",ShowOrbits=True):
+                        variationmode="",ShowOrbits=True,ExtraPrecisionVars=0):
+    
+    
+    openclfunc,queue,ExtraPrecisionVars= PrepStabilityFractalGPU(fl,
+                                                                 dtype=dtype,
+                                                                 cycles=cycles,
+                                                                 ittCountColouring=ittCountColouring,
+                                                                 variation=variationmode,
+                                                                 ExtraPrecisionVars=ExtraPrecisionVars)
+    
+    if isinstance(fl,sp.Basic):
+        fl=sp.lambdify((x,c),fl)
     Orbitinnerwrap,variationmode=applyvariation(variationmode,fl,Divlim)
-    openclfunc,queue= PrepStabilityFractalGPU(fl,dtype=dtype,cycles=cycles,ittCountColouring=ittCountColouring,variation=variationmode)
-    def innerwrap(x1,x2,y1,y2,maxdepth=maxdepth):
-        return StabilityFractalPyOpenCL(x1,x2,y1,y2,npoints,openclfunc,queue,DivLim=Divlim,maxdepth=maxdepth,cycles=cycles,cycleacc=cycleacc)
-    return innerwrap,Orbitinnerwrap
+    def innerwrap(x1,x2,y1,y2,maxdepth=maxdepth,ExtraPrecisionVars=ExtraPrecisionVars):
+        return StabilityFractalPyOpenCL(x1,x2,y1,y2,npoints,openclfunc,queue,ExtraPrecisionVars=ExtraPrecisionVars,DivLim=Divlim,maxdepth=maxdepth,cycles=cycles,cycleacc=cycleacc)
+    return innerwrap,Orbitinnerwrap,ExtraPrecisionVars
 
 def WrapperJuliaFractalOpenCltoDraw(x1,x2,y1,y2,C,fl,npoints=1000,Divlim=2.0,maxdepth=30,dtype="cdouble_",
                         Code=StabilityFractalNoCycle,cycles=False,cycleacc=1e-5,ittCountColouring=True,
                         variationmode="",ShowOrbits=True):
     Orbitinnerwrap,variationmode=Juliaapplyvariation(variationmode,fl,Divlim)
-    openclfunc,queue= PrepStabilityFractalGPU(fl,dtype=dtype,cycles=cycles,ittCountColouring=ittCountColouring,variation=variationmode,juliaMode=True)
+    openclfunc,queue,ExtraPrecisionVars= PrepStabilityFractalGPU(fl,dtype=dtype,cycles=cycles,ittCountColouring=ittCountColouring,variation=variationmode,juliaMode=True)
     def innerwrap(x1,x2,y1,y2,C,maxdepth=maxdepth):
         return JuliaFractalPyOpenCL(x1,x2,y1,y2,C,npoints,openclfunc,queue,DivLim=Divlim,maxdepth=maxdepth,cycles=cycles,cycleacc=cycleacc)
     return innerwrap,Orbitinnerwrap

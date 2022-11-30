@@ -37,7 +37,7 @@ def plotfract(cmap,stabilities=None,extent=None,plottype=None,ax=None):
         return cmap
 
 def setupfig(stabilities,extent,Grid,plottype,cmap,plotfunc=plotfract):
-    mpl.use('TKAgg')
+    #mpl.use('TKAgg')
     fig, ax = plt.subplots()
     ax.set_aspect("auto")
     plt.grid(Grid)
@@ -48,20 +48,24 @@ def setupfig(stabilities,extent,Grid,plottype,cmap,plotfunc=plotfract):
     ax.spines.top.set_color('none')
     ax.xaxis.set_ticks_position('bottom')
     ax.yaxis.set_ticks_position('left')
-    ax.set_xlim(extent[0],extent[1])
-    ax.set_ylim(extent[2],extent[3])
+    #ax.set_xlim(extent[0],extent[1])
+    #ax.set_ylim(extent[2],extent[3])
     cmap=plotfunc(cmap,stabilities,extent,plottype,ax)
     return fig,ax
 #should prolly be a class
 def ZoomableFractalViewer(stabilities,extent,generator,args=[],plottype="imshow",cmap="terrain",Grid=False,plotfunc=plotfract,plotorbits=True):
-    print(args)
-    print(*args)
-    fig,ax=setupfig(stabilities,extent,Grid,plottype,cmap)
+    print(extent)
+    
     try:
         generator,Orbitgenerator=generator
     except TypeError:
         print("Orbit gen functions not passed")
         plotorbits=False
+    try:
+        extent,ExtraPrecisionVars=extent
+    except TypeError:
+        print("ExtraPrecisionVars not passed")
+    fig,ax=setupfig(stabilities,extent,Grid,plottype,cmap)
     def on_press(event):
         sys.stdout.flush()
         if event.key == 'h':
@@ -126,12 +130,28 @@ def ZoomableFractalViewer(stabilities,extent,generator,args=[],plottype="imshow"
         fig.canvas.mpl_connect('motion_notify_event', mouse_move)
     def resize(event):
         nonlocal cmap#ewwwww
+        nonlocal extent
+        nonlocal ExtraPrecisionVars
         x= ax.get_xlim()
         y= ax.get_ylim()
-        if extent!=[*x,*y]:
+        if (extent!=[*x,*y]).any():
             #extent[:]=*x,*y
-            stabilities,extent[:]=generator(y[0],y[1],x[0],x[1],*args)
+            stabilities,extentandprecision=generator(y[0],y[1],x[0],x[1],
+                                                                    *args,
+                                                                    ExtraPrecisionVars=ExtraPrecisionVars)
+            print("from generator")
+            print(extentandprecision)
+            (extent,ExtraPrecisionVars)=extentandprecision
+            print(ExtraPrecisionVars)
+            print(extent)
+            x1,x2,y1,y2=extent
+            extent[:]=x1+ExtraPrecisionVars[0].real,x2+ExtraPrecisionVars[0].real,y1+ExtraPrecisionVars[0].imag,y2+ExtraPrecisionVars[0].imag
+            
+            
+            
             cmap=plotfunc(cmap,stabilities,[*x,*y],plottype,ax)
+            ax.set_xlim(*x)
+            ax.set_ylim(*y)
     fig.canvas.mpl_connect('button_release_event',resize)
     fig.canvas.mpl_connect('key_press_event', on_press)
     plt.show(block=True)
@@ -149,9 +169,13 @@ def ZoomableFractalViewer(stabilities,extent,generator,args=[],plottype="imshow"
     text_box.set_val(cmap)  # Trigger `submit` with the initial string.
     """
     
-def StabilityandJuliaDoubleplot(Stabilities,JuliaVals,extent,JuliaFractalConst,generator,juliagenerator,plottype="imshow",cmap="terrain",extent2=None,args=[],plotfunc=plotfract,plotorbits=True):
+def StabilityandJuliaDoubleplot(Stabilities,JuliaVals,extent,JuliaFractalConst,generator,juliagenerator,Magnifications=[1,1],plottype="imshow",cmap="terrain",extent2=None,args=[],plotfunc=plotfract,plotorbits=True):
     if not extent2:extent2=extent
     extent2orig=extent2.copy()
+    extent=np.array(extent)
+    extent2=np.array(extent2)
+    Xlen,Ylen=np.shape(Stabilities)
+    NumZooms =0
     from matplotlib import gridspec
     MouseCurrentaxis=None
     plt.ion()
@@ -208,6 +232,7 @@ def StabilityandJuliaDoubleplot(Stabilities,JuliaVals,extent,JuliaFractalConst,g
         if event.key == "control" and MouseCurrentaxis==0:
             nonlocal cmap
             nonlocal JuliaFractalConst
+            Magnifications[1]=1
             x,y=event.xdata,event.ydata
             ax[1].set_title("Orbit of input Function X0,Y0 = "+str(complex(round(x,4),round(y,4))))
             JuliaFractalConst=complex(x,y)
@@ -229,18 +254,79 @@ def StabilityandJuliaDoubleplot(Stabilities,JuliaVals,extent,JuliaFractalConst,g
     def resize(event):
         nonlocal cmap#ewwwww
         nonlocal MouseCurrentaxis
-        xlim= ax[0].get_xlim()
-        ylim= ax[0].get_ylim()
-        if extent!=[*xlim,*ylim] and MouseCurrentaxis==0:
-            #print("zooming image 1")
-            stabilities,extent[:]=generator(ylim[0],ylim[1],xlim[0],xlim[1],*args)
-            cmap=plotfunc(cmap,stabilities,[*xlim,*ylim],plottype,ax[0])
+        nonlocal extent
+        nonlocal extent2
+        mindist=1e-6
+        MagnificationStep=1e-6
+        xlim= np.array(ax[0].get_xlim())
+        ylim= np.array(ax[0].get_ylim())
+        
+        if (extent!=[*xlim,*ylim]).any() and MouseCurrentaxis==0:
+            nonlocal NumZooms
+            NumZooms+=1
+            print(NumZooms)
+            extent=np.array([ylim[0],ylim[1],xlim[0],xlim[1]])
+            print("zooming image 1")
+            print(f"xlim: {xlim}")
+            print(f"ylim: {ylim}")
+            print(f"XWidth = {xlim[1]-xlim[0]}")
+            print(f"YWidth = {ylim[1]-ylim[0]}")
+            #print(f"xlimmag: {xlimmag}")
+            #print(f"ylimmag: {ylimmag}")
+            if (xlim[1]-xlim[0])/Xlen<mindist or (ylim[1]-ylim[0])/Ylen<mindist:
+                print("\n\n Approaching Double Limit\n\n")
+                print(f"extent before adjustment {extent}")
+                Magnifications[0]*=MagnificationStep
+                extentmag=(extent/MagnificationStep)
+                print(extentmag)
+                extentmag-=1/MagnificationStep
+                print(f"extent post adjustment {extentmag}")
+                xlimmag=(np.array(xlim)/MagnificationStep)#-1/MagnificationStep-np.sign(xlim)/MagnificationStep#/Magnifications[0]
+                ylimmag=(np.array(ylim)/MagnificationStep)#-1/MagnificationStep-np.sign(ylim)/MagnificationStep#/Magnifications[0]
+                xl=xlimmag[1]-xlimmag[0]
+                yl=ylimmag[1]-ylimmag[0]
+                print(f"XWidth no add = {xlimmag[1]-xlimmag[0]}")
+                print(f"YWidth no add = {ylimmag[1]-ylimmag[0]}")
+                xlimmag=(np.array(xlim)/MagnificationStep)-1/MagnificationStep
+                ylimmag=(np.array(ylim)/MagnificationStep)-1/MagnificationStep
+                print(f"XWidth  = {xlimmag[1]-xlimmag[0]}")
+                print(f"YWidth  = {ylimmag[1]-ylimmag[0]}")
+                print(xl)
+                print(yl)
+                print((extentmag[3]-extentmag[2])/xl)
+                print((extentmag[1]-extentmag[0])/yl)
+                print(Magnifications[0])
+            else:
+                extentmag=extent[:] 
+                
+            
+            """elif (xlim[1]-xlim[0])/Xlen>mindist or (ylim[1]-ylim[0])/Ylen>mindist:
+                Magnifications[0]/=1/2
+                extent= extent/Magnifications[0]
+                xl=xlimmag[1]-xlimmag[0]
+                yl=ylimmag[1]-ylimmag[0]"""
+            stabilities,notextent=generator(*extentmag,*args,Magnification=Magnifications[0])
+            print("extent from out of generator:")
+            print(notextent)
+            cmap=plotfunc(cmap,stabilities,extent=[extentmag[2],extentmag[3],extentmag[0],extentmag[1]],plottype=plottype,ax=ax[0])
+            ax[0].set_xlim(extentmag[2],extentmag[3])
+            ax[0].set_ylim(extentmag[0],extentmag[1])
+            #ax[0].set_xlim(extent[2],extent[3])
+            #ax[0].set_ylim(extent[0],extent[1])
+            print(extent)
+            print("leaving resize")
+            #extent[:]=extent[:]
+            #cmap=plotfunc(cmap,stabilities,extent,plottype,ax[0])
         else:
             xlim= ax[1].get_xlim()
             ylim= ax[1].get_ylim()
             if extent2!=[*xlim,*ylim] and MouseCurrentaxis==1:
                 #print("zooming image 2")
-                stabilities,extent2[:]=juliagenerator(ylim[0],ylim[1],xlim[0],xlim[1],JuliaFractalConst,*args)
+                extent2=np.array([ylim[0],ylim[1],xlim[0],xlim[1]])
+                if (xlim[1]-xlim[0])/Xlen<1e-13 or (ylim[1]-ylim[0])/Ylen<1e-13:
+                    Magnifications[1]*=1e-8
+                    extent2/=Magnifications[1]   
+                stabilities,extent2[:]=juliagenerator(ylim[0],ylim[1],xlim[0],xlim[1],JuliaFractalConst,Magnification=Magnifications[1],*args)
                 cmap=plotfunc(cmap,stabilities,[*xlim,*ylim],plottype,ax[1])
     
         

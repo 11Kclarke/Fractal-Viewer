@@ -23,7 +23,7 @@ optable = {'+': lambda x, y: x + y,
 #must obey order of operations
 operations2arg = ["^","/","*","+"]
 #operations2arg=operations2arg[::-1]
-replacements2arg = ["(dtype_#pow#(base,arg))","(dtype_#divide#(base,arg))","(dtype_#mul#(base,arg))","dtype_#add#(base,arg)"]
+replacements2arg = ["(dtype_#pow#(base,arg))","(dtype_#divide#(base,arg))","(dtype_#mul#(base,arg))","(dtype_#add#(base,arg))"]
 #replacements2arg=replacements2arg[::-1]
 #e^(i*x)="dtype_rpow(2.71828182,dtype_mul((dtype_t){0,1},arg))"
 #e^(-i*x)="dtype_rpow(2.71828182,dtype_mul((dtype_t){0,-1},arg))"
@@ -67,17 +67,7 @@ def removeextrabrackets(operation):
 
 
 def GetArg(arg,r=False,diagnosticmode=False):
-    """extracted=True
-    
-    if arg.count("(")-arg.count(")")!=0 or " " in arg.strip():
-        print("not already extracted")
-        print(arg.count("("))
-        print(arg.count(")"))
-        print(arg)
-        extracted=False
-    if extracted:
-        return arg"""
-        
+    specialchars=[" ",","]+operations2arg
     openbracet="("
     closebracet=")"
     reverse=0
@@ -88,7 +78,12 @@ def GetArg(arg,r=False,diagnosticmode=False):
         reverse=+1
     
     #this if might be worst line in whole project
-    if arg.find(openbracet)>arg.find(closebracet) or ((not (openbracet in arg)) and closebracet in arg) and not "," in arg[:arg.find(closebracet)]:
+    if (arg.find(openbracet)>arg.find(closebracet) or ((not (openbracet in arg)) and closebracet in arg)) and (not "," in arg[:arg.find(closebracet)]):
+        #print(arg)
+        #print(arg[:arg.find(closebracet)])
+        
+        #print(closebracet)
+        #print("," in arg[:arg.find(closebracet)])
         arg=arg[:arg.find(closebracet)]#if close bracket appears before open bracket operator must have been in bracket
         #this is prolly why i had bracket count being compared to -1 not 0 in prev iterations
         #print("leaving from sketchy if statment")
@@ -117,6 +112,7 @@ def GetArg(arg,r=False,diagnosticmode=False):
                     print(f"bracket counnt = {bracketcount}")
             if bracketcount==0:
                 if startedcounting:
+                    #for i in 
                     arg=arg[:i+1] 
                     break
                 if val==",":
@@ -292,13 +288,34 @@ def translateRegion(workingfs,operations=operations2arg,replacements2arg=replace
     
     return workingfs
 
-def translate(fl,operations=operations2arg,replacements2arg=replacements2arg,outputarg = "",dtype="cdouble_",returnsig=True):
-    if isinstance(fl,str):
-        fl=sp.lamdify(fl)
+def translate(f,extraPrecisionArgs=0,operations=operations2arg,replacements2arg=replacements2arg,outputarg = "",dtype="cdouble_",returnsig=True):
+    x,c,y,a,b,d=sp.symbols("x,c,y,a,b,d")
+    extraPrecisionArgsStorage=[]
+    if extraPrecisionArgs>0:
+        print(f)
+        for i in range(extraPrecisionArgs):
+            f=f.subs(x,"extrprecision"+str(i)+"+ x")
+            f=f.subs(c,"extrprecision"+str(i)+"+ c")
+            f=f.expand()
+            extraPrecisionArgsStorage.append("extrprecision"+"["+str(i)+"]")
+            
+            print(extraPrecisionArgsStorage)
+    print(f.atoms(sp.Symbol))
+    symbolsinF=list(f.atoms(sp.Symbol))
+    #if x in symbolsinF:
+        #symbolsinF[0],symbolsinF[symbolsinF.index(x)]=symbolsinF[symbolsinF.index(x)],symbolsinF[0]   
+    print(f)
+    fl=sp.lambdify(symbolsinF,f)
+    print(fl)
+    
     fsorig=inspect.getsource(fl)
     fsorig=fsorig.replace("**","^")#a special case poor solution, to deal with difficulty seperating * from **
     fsorig=fsorig.replace("- ","+-")#should do this for all 1arg funcs, however many like sin and cos or log would already have a + or - infront
+    
     sig=makesig(fsorig.split("\n",1)[0],dtype)
+    #for i in extraPrecisionArgsStorage:
+        #sig.append(","+dtype+" "+i)
+    print(sig)
     workingfs  = fsorig.split("\n",1)[1]
     workingfs = workingfs.replace("return","").strip()
     workingfs=workingfs.replace("1.0*","")
@@ -342,7 +359,15 @@ def translate(fl,operations=operations2arg,replacements2arg=replacements2arg,out
         substitution=genimag.replace("dtype_",dtype)
         workingfs=workingfs.replace("1j",substitution)
         #print("replaced "+Coef+"*1j"+", with"+substitution)#for some reason f string wouldnt do this     
-           
+    orderedsig=[]
+    if extraPrecisionArgs>0:
+      
+        print("\n\n\n\n end of translate \n\n\n")
+        sigstr=" ,".join(sig)
+        for i in range(extraPrecisionArgs):
+            workingfs=workingfs.replace("extrprecision"+str(i),"extrprecision"+"["+str(i)+"]")
+            sigstr=sigstr.replace("extrprecision"+str(i),"extrprecision"+"["+str(i)+"]")
+        sig=sigstr.split(",")      
     if returnsig: 
         return sig, workingfs 
     else:
@@ -350,13 +375,23 @@ def translate(fl,operations=operations2arg,replacements2arg=replacements2arg,out
 """TO DO:
 Fix bug with brackets inside of array index, causing inbetweenbrackets to be wrong
 make matching of variables in function def to call sig more intuitive"""
-def subsfunction(f,code,name,RemoveSemiColon=True):
-    
-    
-    originalargs=[]
+def subsfunction(f,code,name,RemoveSemiColon=True,sig=None):
+    autosig,func=f
+    if sig==None:
+        sig=autosig
+    print("func in")
     print(f)
+    print(sig)
+    print("to this code")
+    print(code)
     
-    sig,func=f
+    originalfuncargs=[]
+    for i,val in enumerate(sig):#gets all variable names required for function being subbed
+        if "[" in val:
+            val=val[:val.find("[")]
+        originalfuncargs.append(val.strip().split(" ")[-1]+" ")
+    print(originalfuncargs)
+    
     #print(f)
     legalendchars=["=","-","/","*",",",")"]#characters allowed directly after variable
     #if there were a key word whose name contained a var name it wont be replaced unless next char is in list
@@ -364,17 +399,14 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
     for i in legalendchars:#Adds spaces after end chars so variables can be identified 
                 func=func.replace(i," "+i+" ")
                 #code=code.replace(i," "+i+" ")
+   
     
-    for i in sig:#gets all variable names required for function being subbed
-        originalargs.append(i.split(" ")[-1]+" ")
-        
-        #print((i.split(" ")[1]))
-    #originalargs=sig[sig.find("(")+1:-2].split(",")  
-    #print(originalargs)
+   
+    
     #print()  
-    #print("code split")
+    print("code split")
     codesplit = code.split("__")
-    #print(codesplit)
+    print(codesplit)
     
     for split in codesplit:
         if split.split("(")[0] == name:#split here will be the function name and its input eg "f(x)"
@@ -387,12 +419,17 @@ def subsfunction(f,code,name,RemoveSemiColon=True):
             #eg subbing somthing into __f(a,b)__ inbetween brackets would be ["a","b"]
             # strinbetweenbrackets = "a,b"
            
-            assert len(originalargs)==len(inbetweenbrackets)
+            #assert len(originalargs)==len(inbetweenbrackets)
             
-            for i in zip(originalargs,inbetweenbrackets):#replaces args in function def with arg in location
-                print("replacing ")
-                print(i[0].strip(),i[1].strip())
-                func=func.replace(i[0].strip()+" ",i[1].strip())#the +" " is critical
+            for i in zip(originalfuncargs,inbetweenbrackets):#replaces args in function def with arg in location
+                if "[" in i[1]:
+                    print(inbetweenbrackets)
+                    func=func.replace(i[0].strip(),i[1].strip().strip("]").strip("["))
+                    #i[1]=inbetweenbrackets
+                else:    
+                    print("replacing ")
+                    print(i[0].strip(),i[1].strip())
+                    func=func.replace(i[0].strip()+" ",i[1].strip())#the +" " is critical
                 #it prevents variable names coincidentally appearing as substrings in other things being replaced
                 #for example when c is a variable being replaced with Const c_double goes to Const_double
                 # a better solution would find a instance of substring then somehow check adjacent to it
@@ -419,34 +456,44 @@ if __name__ == '__main__':#for testing not really intedned to be ran
     queue = cl.CommandQueue(ctx)
 
     A=np.linspace(0,np.pi*6,1000,dtype=np.complex128)#1val for easy testing
-    x,c=sp.symbols("x,c")
+    x,extrprecision0,c=sp.symbols("x,extrprecision[0],c1")
     #f=(sp.exp(1j*x)+sp.exp(-1j*x))*0.5
     #f=sp.exp(x)
-    #f=(sp.exp(1j*x)+sp.exp(-1j*x))*0.5
-    f=sp.cos(x)**2 + sp.sin(x)**2
-    fl=sp.lambdify(x,f)
-    print(inspect.getsource(fl))
-    flt=translate(fl)
+    #f=(sp.exp(1j*x)+sp.exp(-1j*x))*0.5#
+    
+    extraprecision=1
+    f=x**2+c
+   
+    
+    #fl=sp.lambdify(x,f)
+    #print(f)
+    #print(inspect.getsource(fl))
+    flt=translate(f,extraPrecisionArgs=1)
+   
+        
+    print(flt)
+    
     """
     cosgenimage=flt[1].replace("cdouble_","dtype_").replace("x","arg")
     print("\n\nCos(arg)=\n")
     print(cosgenimage)
     print("\n\n\n")
     """
-    mapclstr = subsfunction(flt,mapclstr,"f")
+    
+    #mapclstr = subsfunction(flt,mapclstr,"f")
     #A=np.arange(25).reshape((5,5))
 
     
     
-    res_g = cl.array.to_device(queue, A)
+    #res_g = cl.array.to_device(queue, A)
 
 
-    mapcl = ElementwiseKernel(ctx,"cdouble_t *X,cdouble_t c",mapclstr,"mapcl",preamble="#define PYOPENCL_DEFINE_CDOUBLE //#include <pyopencl-complex.h>  ")
-    mapcl(res_g,1)
+    #mapcl = ElementwiseKernel(ctx,"cdouble_t *X,cdouble_t c",mapclstr,"mapcl",preamble="#define PYOPENCL_DEFINE_CDOUBLE //#include <pyopencl-complex.h>  ")
+    #mapcl(res_g,1)
     #print(res_g.get())
-    cos=res_g.get()
-    plt.plot(cos)
-    plt.show()
+    #cos=res_g.get()
+    #plt.plot(cos)
+    #plt.show()
     """ctx = cl.create_some_context()
     queue = cl.CommandQueue(ctx)
 

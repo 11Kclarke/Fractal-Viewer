@@ -32,26 +32,26 @@ def DrawNewtonsFractalOpencl(x1,x2,y1,y2,fl,fprimel=None,npoints=1000, maxdepth=
     Roots,extent=innerwrap(x1,x2,y1,y2)
     ZoomableFractalViewer(Roots,extent,(innerwrap,orbitgen))
     
-def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1024, maxdepth=3000,cycles=16,cycleacc=None,ittcountcolouring=True,Divlim=2,variation="",ShowOrbits=True):
+def DrawStabilityFractalOpencl(x1,x2,y1,y2,fl,npoints=1024, maxdepth=3000,cycles=16,cycleacc=None,ittcountcolouring=True,Divlim=2,variation="",ShowOrbits=True,extraPrecision=0):
     if isinstance(fl,str):
         fl=parse_expr(fl)
-        fl=sp.lambdify((x,c),fl)
-    if isinstance(fl,sp.Basic):
-        fl=sp.lambdify((x,c),fl)
+        #fl=sp.lambdify((x,c),fl)
+    #if isinstance(fl,sp.Basic):
+        #fl=sp.lambdify((x,c),fl)
     
-    innerwrap,orbitgen = PyopenclStabilityFractal.WrapperStabilityFractalOpenCltoDraw(x1,x2,y1,y2,fl,npoints=npoints, maxdepth=maxdepth,cycles=cycles,
+    innerwrap,orbitgen,extraPrecision = PyopenclStabilityFractal.WrapperStabilityFractalOpenCltoDraw(x1,x2,y1,y2,fl,npoints=npoints, maxdepth=maxdepth,cycles=cycles,
                                                              cycleacc=cycleacc,ittCountColouring=ittcountcolouring,Divlim=Divlim,
-                                                             variationmode=variation,ShowOrbits=ShowOrbits)
-    Roots,extent=innerwrap(x1,x2,y1,y2)
+                                                             variationmode=variation,ShowOrbits=ShowOrbits,ExtraPrecisionVars=extraPrecision)
+    Roots,extent=innerwrap(x1,x2,y1,y2,ExtraPrecisionVars=extraPrecision)
     #Roots=np.log(abs(Roots))
     ZoomableFractalViewer(Roots,extent,(innerwrap,orbitgen))
         
 def DrawJuliaFractalOpencl(x1,x2,y1,y2,C,fl,npoints=1024, maxdepth=3000,cycles=16,cycleacc=None,ittcountcolouring=True,Divlim=2,variation="",ShowOrbits=True):
     if isinstance(fl,str):
         fl=parse_expr(fl)
-        fl=sp.lambdify((x,c),fl)
-    if isinstance(fl,sp.Basic):
-        fl=sp.lambdify((x,c),fl)
+        #fl=sp.lambdify((x,c),fl)
+    #if isinstance(fl,sp.Basic):
+        #fl=sp.lambdify((x,c),fl)
     innerwrap,orbitgen = PyopenclStabilityFractal.WrapperJuliaFractalOpenCltoDraw(x1,x2,y1,y2,C,fl,npoints=npoints, maxdepth=maxdepth,cycles=cycles,
                                                              cycleacc=cycleacc,ittCountColouring=ittcountcolouring,Divlim=Divlim,
                                                              variationmode=variation,ShowOrbits=ShowOrbits) 
@@ -61,9 +61,9 @@ def DrawJuliaFractalOpencl(x1,x2,y1,y2,C,fl,npoints=1024, maxdepth=3000,cycles=1
 def Draw2axisJuliaStabilityFractalOpencl(x1,x2,y1,y2,C,fl,npoints=1024, maxdepth=3000,cycles=16,cycleacc=None,ittcountcolouring=True,Divlim=2,variation="",ShowOrbits=True,x1j=None,x2j=None,y1j=None,y2j=None):
     if isinstance(fl,str):
         fl=parse_expr(fl)
-        fl=sp.lambdify((x,c),fl)
-    if isinstance(fl,sp.Basic):
-        fl=sp.lambdify((x,c),fl)
+        #fl=sp.lambdify((x,c),fl)
+    #if isinstance(fl,sp.Basic):
+        #fl=sp.lambdify((x,c),fl)
     if not(all([x1j,x2j,y1j,y2j])):
         x1j,x2j,y1j,y2j=x1,x2,y1,y2   
     #innerwraps contain julliainnerwrap,juliaorbitgen 
@@ -75,20 +75,21 @@ def Draw2axisJuliaStabilityFractalOpencl(x1,x2,y1,y2,C,fl,npoints=1024, maxdepth
     Stabilityinnerwrap = PyopenclStabilityFractal.WrapperStabilityFractalOpenCltoDraw(x1,x2,y1,y2,fl,npoints=npoints, maxdepth=maxdepth,cycles=cycles,
                                                              cycleacc=cycleacc,ittCountColouring=ittcountcolouring,Divlim=Divlim,
                                                              variationmode=variation,ShowOrbits=ShowOrbits)
-    Stabilities,extent=Stabilityinnerwrap[0](x1,x2,y1,y2)
+    Stabilities,extent=Stabilityinnerwrap[0](x1,x2,y1,y2,Magnification=1)
     StabilityandJuliaDoubleplot(Stabilities,JuliaVals,extent,C,Stabilityinnerwrap,julliainnerwrap,extent2=extent2)
     
 if __name__ == '__main__':
    
     starttime = timeit.default_timer()
-    
-    res = 1000
-    maxdepth = 1048
+    #(0.022242099619268346, 0.022295326445721946, -1.6279601789546387, -1.6278827581161608)
+    res = 500
+    maxdepth = 500
     f=x**2+c
-    Draw2axisJuliaStabilityFractalOpencl(-2,2,-2,2,-0.4+0.6j,f,maxdepth=maxdepth,npoints=res,cycles=10,ittcountcolouring=True)
+    extent=np.array([-2,2,-2,2])#*100
+    #Draw2axisJuliaStabilityFractalOpencl(*extent,-0.4+0.6j,f,maxdepth=maxdepth,npoints=res,cycles=10,ittcountcolouring=True)
     #fl=sp.lambdify(x,f)
     #fpl=sp.lambdify(x,sp.diff(f))
-    #DrawStabilityFractalOpencl(-2,2,-2,2,f,maxdepth=maxdepth,npoints=res,cycles=10,ittcountcolouring=True)
+    DrawStabilityFractalOpencl(-2,2,-2,2,f,maxdepth=maxdepth,npoints=res,cycles=10,ittcountcolouring=True,extraPrecision=1)
     #DrawJuliaFractalOpencl(-2,2,-2,2,-0.4+0.6j,f,maxdepth=maxdepth,npoints=res,cycles=10,ittcountcolouring=True)
     #DrawNewtonsFractalOpencl(-2,2,-2,2,fl,fpl,npoints=res,maxdepth=500,tol=1e-6)
     
