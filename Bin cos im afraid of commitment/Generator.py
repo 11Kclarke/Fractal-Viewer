@@ -130,7 +130,7 @@ def iterator(function, maxdepth, value,D,divergencedetector=absdivergencedetecto
     return maxdepth*1.5
 
 """Takes complex to complex function, and complex value, 
-and returns reecursion count before value > lim"""
+and returns recursion count before value > lim"""
 #@njit
 def simprecurse(function, maxdepth, value,D,lim=16):
     ys=function(0,value)

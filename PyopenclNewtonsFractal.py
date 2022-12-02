@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import sympy as sp
 import timeit
 import PyToPyOpenCL#mine
-from numba import njit,prange
+from Utils import CreateStartVals
 """Possible issue with input funcs where the derivative near 0 is tiny and actual func isnt ie x^n+c with large N"""
 
 os.environ["PYOPENCL_CTX"]="0"
@@ -45,33 +45,7 @@ def PrepNewtonsFractalGPU(fl,fprimel,dtype="cdouble_"):
     queue = cl.CommandQueue(ctx)
     return ElementwiseKernel(ctx,dtype+"t"+"*X,int N,double precision",mapclstr,"NewtonsMethod",preamble="#define PYOPENCL_DEFINE_CDOUBLE //#include <pyopencl-complex.h>  "),queue
 
-def createstartvalssimp(x1,x2,y1,y2,SideLength):#this essentially creates a flattened grid for using as input into pyopenclfuncs
-    Xs=np.linspace(x1,x2,SideLength,dtype=np.complex128)
-    Ys=np.linspace(y1*1j,y2*1j,SideLength)
-    Vals=np.zeros(SideLength*SideLength,dtype=np.complex128)
-    """for i,x in enumerate(Xs):
-        for j,y in enumerate(Ys):
-            Vals[(i+1)*(j+1)]=x+y"""
-    for i in range(SideLength):
-        Vals[i*SideLength:i*SideLength+SideLength]=Xs
-        Vals[i*SideLength:i*SideLength+SideLength]+=Ys[i]#every y val repeated side length times"""
-    return Vals#can be reshaped into square grid    
 
-#@njit(parallel=True)
-def createstartvals(x1,x2,y1,y2,SideLength):#this essentially creates a flattened grid for using as input into pyopenclfuncs
-    Xlength=int(np.ceil(abs((x1-x2)/(y1-y2)*SideLength)))
-    Ylength=int(np.ceil((SideLength**2)/Xlength))
-    Xs=np.linspace(-x1*1j,-x2*1j,Xlength).astype(np.complex128)
-    Ys=np.linspace(y1,y2,Ylength).astype(np.complex128)
-    Vals=np.zeros(Xlength*Ylength).astype(np.complex128)
-    """for i,x in enumerate(Xs):
-        for j,y in enumerate(Ys):
-            Vals[i,j]=x+y"""
-    
-    for i in prange(Xlength):
-        Vals[i*Ylength:i*Ylength+Ylength]=Ys
-        Vals[i*Ylength:i*Ylength+Ylength]+=Xs[i]#every y val repeated side length times
-    return Vals,(Xlength,Ylength)
     
     
 
@@ -79,7 +53,7 @@ def NewtonsFractalPyOpenCL(x1,x2,y1,y2,SideLength,mapcl,queue,tol=1e-12,maxdepth
     
     #starttime = timeit.default_timer()
     extent = [x1,x2,y1,y2]
-    InnitialValues,shape=createstartvals(x1,x2,y1,y2,SideLength)
+    InnitialValues,shape=CreateStartVals(x1,x2,y1,y2,SideLength)
     InnitialValues.reshape(shape)
     Roots=cl.array.to_device(queue,InnitialValues) 
     mapcl(Roots,np.intc(maxdepth),np.float64(tol))

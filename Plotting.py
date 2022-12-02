@@ -6,32 +6,37 @@ import sys
 import timeit
 from matplotlib.widgets import TextBox
 #plt.ion()
-def plotfract(cmap,stabilities=None,extent=None,plottype=None,ax=None):    
-        print(f"{extent} from inside plotting")
+def plotfract(cmap,stabilities=None,extentplot=None,plottype=None,ax=None):
+        #extentplot=[extentplot[2],extentplot[3],extentplot[0],extentplot[1]]    
+        print(f"{extentplot} from inside plotting")
         if plottype=="imshow":
             minval=np.min(stabilities)
             maxval=np.max(stabilities)
-            if maxval-minval>1000 and minval<0:
-                if minval>0:minval=-0.01
-                if maxval<0:maxval=0.01
-                maxval*=1/30
-                #minval=-np.log(-minval)
-                minval=minval/400
+            if maxval-minval>1000 and minval<0 and maxval>0:
+                
+                
+                while maxval-minval>1000:
+                    maxval*=1/2
+                    minval*=1/2
+                    stabilities*=1/2
                 divnorm = mpl.colors.TwoSlopeNorm(vmin=minval, vcenter=0, vmax=maxval)
-                ax.imshow(stabilities,extent=extent,origin='lower',cmap=cmap,norm=divnorm)
+                ax.imshow(stabilities,extent=extentplot,origin='lower',cmap=cmap,norm=divnorm)
+            elif maxval-minval>1000:
+                while maxval-minval>1000:
+                    maxval*=1/2
+                    minval*=1/2
+                    stabilities*=1/2
+                divnorm = mpl.colors.TwoSlopeNorm(vmin=minval, vcenter=(minval+maxval)/2, vmax=maxval)
+                ax.imshow(stabilities,extent=extentplot,origin='lower',cmap=cmap,norm=divnorm)
             else:
-                ax.imshow(stabilities,extent=extent,origin='lower',cmap=cmap)
+                ax.imshow(stabilities,extent=extentplot,origin='lower',cmap=cmap)
             #ax.imshow(stabilities,extent=extent,origin='lower',cmap=cmap)
         elif plottype=="contour":
             shape=np.shape(stabilities)
-            xcoords= np.linspace(extent[0],extent[1],shape[0])
-            ycoords= np.linspace(extent[2],extent[3],shape[1])
+            xcoords= np.linspace(extentplot[0],extentplot[1],shape[0])
+            ycoords= np.linspace(extentplot[2],extentplot[3],shape[1])
             ax.contourf(xcoords,ycoords,stabilities, cmap=cmap)
             #ax.contour(xcoords,ycoords,stabilities)
-        elif plottype=="scatter":
-            xcoords= np.linspace(extent[0],extent[1],shape[0])
-            ycoords= np.linspace(extent[2],extent[3],shape[1])
-            ax.scatter(-xcoords,ycoords,c=stabilities[:,2],cmap=cmap)
         else:
             print(plottype,"is not a valid plot type")
         return cmap
@@ -56,6 +61,7 @@ def setupfig(stabilities,extent,Grid,plottype,cmap,plotfunc=plotfract):
 def ZoomableFractalViewer(stabilities,extent,generator,args=[],plottype="imshow",cmap="terrain",Grid=False,plotfunc=plotfract,plotorbits=True):
     print(args)
     print(*args)
+    (extent,ReferenceOrbit)=extent
     fig,ax=setupfig(stabilities,extent,Grid,plottype,cmap)
     try:
         generator,Orbitgenerator=generator
@@ -106,11 +112,6 @@ def ZoomableFractalViewer(stabilities,extent,generator,args=[],plottype="imshow"
                 x, y = event.xdata, event.ydata
                 if x and y:
                     fig.canvas.flush_events()
-                    #print("postflush")
-                    #print(fig.canvas.events)
-                    #origtime=timeit.default_timer()
-                    
-                    #plt.pause(0.5)
                     Orbit=Orbitgenerator(x,y,*args)
                     #print(f"orbits genned in {timeit.default_timer()-origtime}")
                     #time=timeit.default_timer()
@@ -126,12 +127,36 @@ def ZoomableFractalViewer(stabilities,extent,generator,args=[],plottype="imshow"
         fig.canvas.mpl_connect('motion_notify_event', mouse_move)
     def resize(event):
         nonlocal cmap#ewwwww
+        nonlocal ReferenceOrbit
+        nonlocal extent
         x= ax.get_xlim()
         y= ax.get_ylim()
-        if extent!=[*x,*y]:
-            #extent[:]=*x,*y
-            stabilities,extent[:]=generator(y[0],y[1],x[0],x[1],*args)
-            cmap=plotfunc(cmap,stabilities,[*x,*y],plottype,ax)
+        if extent!=[*y,*x] and not event.key=="n":
+            print("in plot pre gen")
+            extent=np.array([*y,*x])
+            """if isinstance(ReferenceOrbit,np.ndarray):
+                xref0=ReferenceOrbit[0].real
+                yref0=ReferenceOrbit[0].imag
+                extent=[extent[0]-xref0,extent[1]-xref0,extent[2]-yref0,extent[3]-yref0]"""
+            #print(extent)
+            #extent[2],extent[3],extent[0],extent[1]
+            stabilities,(extent,ReferenceOrbit)=generator(*extent,*args,ReferenceOrbit=ReferenceOrbit)
+            """if isinstance(ReferenceOrbit,np.ndarray):
+                xref0=ReferenceOrbit[0].real
+                yref0=ReferenceOrbit[0].imag
+            else:
+                xref0=0
+                yref0=0"""
+            #extentplot=[extent[2]+yref0,extent[3]+yref0,extent[0]+xref0,extent[1]+xref0]
+            cmap=plotfunc(cmap,stabilities,extentplot=[extent[2],extent[3],extent[0],extent[1]],plottype=plottype,ax=ax)
+            #ax.set_xlim(extent[2]+yref0,extent[3]+yref0) 
+            #ax.set_ylim(extent[0]+xref0,extent[1]+xref0)
+            ax.set_xlim(extent[2],extent[3]) 
+            ax.set_ylim(extent[0],extent[1])  
+            print("in plot after gen")
+            print(extent)
+            print(np.max(stabilities))
+            print(np.min(stabilities))
     fig.canvas.mpl_connect('button_release_event',resize)
     fig.canvas.mpl_connect('key_press_event', on_press)
     plt.show(block=True)
