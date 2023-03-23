@@ -31,10 +31,11 @@ StabilityFractalNoCycle="""
 #implementation of gospers algorithm modified from hackers delight. 
 StabilityFractalWithCycle="""
 short k,kmax,m,n;
-dtype_t T[maxCyclelog2+1];
+
 //dtype_t Xn=X[i];//should prolly be 0
 //X[i]= dtype_rmul(0.5,X[i]);
-dtype_t Xn=(dtype_t){0.0,0.0};
+dtype_t Xn=X[i];
+//dtype_t Xn=(dtype_t){0.0,0.0};
 __JuliaOrMandlebrotlike__
 T[0] = X[i];
 for (n = 1; n<N; n++) {
@@ -55,7 +56,7 @@ for (n = 1; n<N; n++) {
         n=N+2;
     }   
 }
-    """
+"""
 
 """Fl seed func, cycles false or 0 for no cycle detection int for number of cycles"""
 def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=False,variation="",juliaMode=False):
@@ -95,9 +96,13 @@ def PrepStabilityFractalGPU(fl,dtype="cdouble_",cycles=False,ittCountColouring=F
         #define PYOPENCL_DEFINE_CDOUBLE 
         //#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
         #include <pyopencl-complex.h>
-        
+        dtype_t T["""+str(cycles)+"""+1];
         __constant int maxCyclelog2 = """+str(cycles)+"""; // should be set to 32 nearly always
         """
+        preamble=preamble.replace("dtype_",dtype) 
+         
+        print(preamble)
+        print(AlwaysArgs + ",double cycleacc")
         return ElementwiseKernel(ctx,AlwaysArgs + ",double cycleacc",mapclstr,"StabilityFractal",preamble=preamble),queue
 
 
